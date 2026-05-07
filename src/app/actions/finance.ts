@@ -13,7 +13,7 @@ export async function getMonths() {
       orderBy: [{ year: 'desc' }, { month: 'desc' }],
     });
   } catch (error: any) {
-    console.error('DATABASE_ERROR [getMonths]:', JSON.stringify({ message: error.message, stack: error.stack, code: error.code, meta: error.meta }));
+    console.error('ERRO PRISMA:', error);
     return [];
   }
 }
@@ -46,7 +46,7 @@ export async function getCurrentMonth() {
 
     return null;
   } catch (error: any) {
-    console.error('DATABASE_ERROR [getCurrentMonth]:', JSON.stringify({ message: error.message, stack: error.stack, code: error.code, meta: error.meta }));
+    console.error('ERRO PRISMA:', error);
     return null;
   }
 }
@@ -112,7 +112,7 @@ export async function getTransactions(monthId: string) {
       orderBy: { date: 'desc' },
     });
   } catch (error: any) {
-    console.error('DATABASE_ERROR [getTransactions]:', JSON.stringify({ message: error.message, stack: error.stack, code: error.code, meta: error.meta }));
+    console.error('ERRO PRISMA:', error);
     return [];
   }
 }
@@ -160,7 +160,7 @@ export async function addTransaction(formData: FormData) {
     revalidatePath('/');
     return { success: true };
   } catch (error: any) {
-    console.error('DATABASE_ERROR [addTransaction]:', JSON.stringify({ message: error.message, stack: error.stack, code: error.code, meta: error.meta }));
+    console.error('ERRO PRISMA:', error);
     return { success: false, error: 'Erro de conexão com o banco de dados.' };
   }
 }
