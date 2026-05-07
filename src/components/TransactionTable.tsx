@@ -25,7 +25,7 @@ export default function TransactionTable({
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
   return (
-    <>
+    <div>
       <div className="mt-8 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800 rounded-2xl overflow-hidden shadow-lg">
       <div className="p-6 border-b border-zinc-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -128,6 +128,7 @@ export default function TransactionTable({
           </tbody>
         </table>
       </div>
+      </div>
       
       <TransactionModal
         isOpen={isModalOpen}
@@ -141,6 +142,6 @@ export default function TransactionTable({
         attachmentUrl={previewData.url}
         fileName={previewData.fileName}
       />
-    </>
+    </div>
   );
 }
