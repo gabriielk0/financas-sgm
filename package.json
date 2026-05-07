@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node -e \"const fs=require('fs'); let s=fs.readFileSync('prisma/schema.prisma','utf8'); if(process.env.DATABASE_PROVIDER==='postgresql'){s=s.replace(/provider = \\\"sqlite\\\"/, 'provider = \\\"postgresql\\\"'); fs.writeFileSync('prisma/schema.prisma',s);} \"",
     "build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint",
