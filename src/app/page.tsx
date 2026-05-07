@@ -18,9 +18,16 @@ export default async function DashboardPage(
   const view = (searchParams?.view as string) || 'monthly';
 
   if (!currentMonth && monthsHistory.length === 0) {
+    // This should theoretically not happen anymore due to First Access logic
+    // but we keep a fallback just in case the DB connection totally fails.
     return (
-      <div className="min-h-screen flex items-center justify-center p-8">
-        <p className="text-zinc-500">Nenhum mês configurado no sistema. Por favor, rode o seed.</p>
+      <div className="min-h-screen flex items-center justify-center p-8 bg-zinc-950 text-center">
+        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-xl max-w-md">
+          <h2 className="text-xl font-bold text-white mb-2">Erro de Conexão</h2>
+          <p className="text-zinc-400">
+            Não foi possível carregar os dados financeiros ou o banco de dados está inacessível.
+          </p>
+        </div>
       </div>
     );
   }

@@ -1,27 +1,54 @@
 'use server';
 
-import { PrismaClient } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 // ==========================
 // MONTH ACTIONS
 // ==========================
 
 export async function getMonths() {
-  return await prisma.monthBalance.findMany({
-    orderBy: [{ year: 'desc' }, { month: 'desc' }],
-  });
+  try {
+    return await prisma.monthBalance.findMany({
+      orderBy: [{ year: 'desc' }, { month: 'desc' }],
+    });
+  } catch (error) {
+    console.error('Failed to get months:', error);
+    return [];
+  }
 }
 
 export async function getCurrentMonth() {
-  const months = await prisma.monthBalance.findMany({
-    where: { isClosed: false },
-    orderBy: [{ year: 'desc' }, { month: 'desc' }],
-    take: 1,
-  });
-  return months[0] || null;
+  try {
+    const months = await prisma.monthBalance.findMany({
+      where: { isClosed: false },
+      orderBy: [{ year: 'desc' }, { month: 'desc' }],
+      take: 1,
+    });
+    
+    if (months.length > 0) return months[0];
+
+    // First access scenario: create the first month automatically
+    const allHistory = await prisma.monthBalance.count();
+    if (allHistory === 0) {
+      const now = new Date();
+      const newMonth = await prisma.monthBalance.create({
+        data: {
+          month: now.getMonth() + 1,
+          year: now.getFullYear(),
+          initialBalance: 5000, // Saldo inicial padrão
+          finalBalance: 5000,
+          isClosed: false,
+        }
+      });
+      return newMonth;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Failed to get current month:', error);
+    return null;
+  }
 }
 
 export async function closeMonth(monthId: string) {
@@ -79,53 +106,63 @@ export async function closeMonth(monthId: string) {
 // ==========================
 
 export async function getTransactions(monthId: string) {
-  return await prisma.transaction.findMany({
-    where: { monthId },
-    orderBy: { date: 'desc' },
-  });
+  try {
+    return await prisma.transaction.findMany({
+      where: { monthId },
+      orderBy: { date: 'desc' },
+    });
+  } catch (error) {
+    console.error('Failed to get transactions:', error);
+    return [];
+  }
 }
 
 export async function addTransaction(formData: FormData) {
-  const monthId = formData.get('monthId') as string;
-  const description = formData.get('description') as string;
-  const type = formData.get('type') as 'IN' | 'OUT';
-  const amount = parseFloat(formData.get('amount') as string);
-  const dateStr = formData.get('date') as string;
-  const status = 'COMPLETED'; // For now, all are completed
+  try {
+    const monthId = formData.get('monthId') as string;
+    const description = formData.get('description') as string;
+    const type = formData.get('type') as 'IN' | 'OUT';
+    const amount = parseFloat(formData.get('amount') as string);
+    const dateStr = formData.get('date') as string;
+    const status = 'COMPLETED';
 
-  const file = formData.get('file') as File | null;
-  let attachmentUrl = undefined;
+    const file = formData.get('file') as File | null;
+    let attachmentUrl = undefined;
 
-  if (file && file.size > 0) {
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const base64Str = buffer.toString('base64');
-    const mimeType = file.type;
-    attachmentUrl = `data:${mimeType};base64,${base64Str}`;
+    if (file && file.size > 0) {
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const base64Str = buffer.toString('base64');
+      const mimeType = file.type;
+      attachmentUrl = `data:${mimeType};base64,${base64Str}`;
+    }
+
+    const month = await prisma.monthBalance.findUnique({
+      where: { id: monthId },
+    });
+
+    if (!month || month.isClosed) {
+      return { success: false, error: 'Cannot add transaction to a closed month.' };
+    }
+
+    await prisma.transaction.create({
+      data: {
+        date: new Date(dateStr),
+        description,
+        type,
+        amount,
+        status,
+        attachmentUrl,
+        monthId,
+      },
+    });
+
+    revalidatePath('/');
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to add transaction:', error);
+    return { success: false, error: 'Erro de conexão com o banco de dados.' };
   }
-
-  const month = await prisma.monthBalance.findUnique({
-    where: { id: monthId },
-  });
-
-  if (!month || month.isClosed) {
-    throw new Error('Cannot add transaction to a closed month.');
-  }
-
-  await prisma.transaction.create({
-    data: {
-      date: new Date(dateStr),
-      description,
-      type,
-      amount,
-      status,
-      attachmentUrl,
-      monthId,
-    },
-  });
-
-  revalidatePath('/');
-  return { success: true };
 }
 
 export async function updateTransaction(
