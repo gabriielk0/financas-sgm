@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Download } from 'lucide-react';
 
 export default function AttachmentPreviewModal({
@@ -13,11 +15,17 @@ export default function AttachmentPreviewModal({
   attachmentUrl: string | null;
   fileName?: string;
 }) {
-  if (!isOpen || !attachmentUrl) return null;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !attachmentUrl || !mounted) return null;
 
   const isPdf = attachmentUrl.includes('application/pdf');
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-4xl h-[85vh] flex flex-col shadow-2xl overflow-hidden">
         
@@ -61,6 +69,7 @@ export default function AttachmentPreviewModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
