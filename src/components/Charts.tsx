@@ -122,7 +122,7 @@ export default function Charts({
                 <YAxis hide />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '12px', color: '#fff' }}
-                  formatter={(value: number) => `R$ ${value.toFixed(2)}`}
+                  formatter={(value: any) => `R$ ${Number(value).toFixed(2)}`}
                 />
                 <Legend verticalAlign="bottom" height={36} iconType="circle" />
                 <Bar dataKey="Entradas" fill="#34d399" radius={[4, 4, 0, 0]} />
@@ -147,7 +147,7 @@ export default function Charts({
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number) => `R$ ${value.toFixed(2)}`}
+                  formatter={(value: any) => `R$ ${Number(value).toFixed(2)}`}
                   contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '12px', color: '#fff' }}
                 />
                 <Legend verticalAlign="bottom" height={36} iconType="circle" formatter={(value) => <span className="text-zinc-300 text-sm">{value}</span>} />
