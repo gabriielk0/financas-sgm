@@ -12,8 +12,8 @@ export async function getMonths() {
     return await prisma.monthBalance.findMany({
       orderBy: [{ year: 'desc' }, { month: 'desc' }],
     });
-  } catch (error) {
-    console.error('Failed to get months:', error);
+  } catch (error: any) {
+    console.error('DATABASE_ERROR [getMonths]:', JSON.stringify({ message: error.message, stack: error.stack, code: error.code, meta: error.meta }));
     return [];
   }
 }
@@ -45,8 +45,8 @@ export async function getCurrentMonth() {
     }
 
     return null;
-  } catch (error) {
-    console.error('Failed to get current month:', error);
+  } catch (error: any) {
+    console.error('DATABASE_ERROR [getCurrentMonth]:', JSON.stringify({ message: error.message, stack: error.stack, code: error.code, meta: error.meta }));
     return null;
   }
 }
@@ -111,8 +111,8 @@ export async function getTransactions(monthId: string) {
       where: { monthId },
       orderBy: { date: 'desc' },
     });
-  } catch (error) {
-    console.error('Failed to get transactions:', error);
+  } catch (error: any) {
+    console.error('DATABASE_ERROR [getTransactions]:', JSON.stringify({ message: error.message, stack: error.stack, code: error.code, meta: error.meta }));
     return [];
   }
 }
@@ -159,8 +159,8 @@ export async function addTransaction(formData: FormData) {
 
     revalidatePath('/');
     return { success: true };
-  } catch (error) {
-    console.error('Failed to add transaction:', error);
+  } catch (error: any) {
+    console.error('DATABASE_ERROR [addTransaction]:', JSON.stringify({ message: error.message, stack: error.stack, code: error.code, meta: error.meta }));
     return { success: false, error: 'Erro de conexão com o banco de dados.' };
   }
 }
