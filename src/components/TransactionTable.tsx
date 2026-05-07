@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { FileText, Plus, ExternalLink, Image as ImageIcon } from 'lucide-react';
+import { FileText, Plus, ExternalLink, Image as ImageIcon, Edit2 } from 'lucide-react';
 import TransactionModal from './TransactionModal';
 import AttachmentPreviewModal from './AttachmentPreviewModal';
 
@@ -20,6 +20,7 @@ export default function TransactionTable({
     url: null,
     fileName: '',
   });
+  const [transactionToEdit, setTransactionToEdit] = useState<any>(null);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -34,7 +35,10 @@ export default function TransactionTable({
         </div>
         {!monthClosed && (
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              setTransactionToEdit(null);
+              setIsModalOpen(true);
+            }}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-[0_0_15px_rgba(79,70,229,0.2)] hover:shadow-[0_0_20px_rgba(79,70,229,0.4)]"
           >
             <Plus className="w-4 h-4" />
@@ -52,7 +56,7 @@ export default function TransactionTable({
               <th className="px-6 py-4 font-medium">Categoria</th>
               <th className="px-6 py-4 font-medium">Status</th>
               <th className="px-6 py-4 font-medium text-right">Valor</th>
-              <th className="px-6 py-4 font-medium text-center">Anexo</th>
+              <th className="px-6 py-4 font-medium text-center">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/50">
@@ -101,26 +105,41 @@ export default function TransactionTable({
                     {t.type === 'IN' ? '+' : '-'} {formatCurrency(t.amount)}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    {t.attachmentUrl ? (
-                      <button
-                        onClick={() =>
-                          setPreviewData({
-                            url: t.attachmentUrl,
-                            fileName: `Comprovante_${t.description.replace(/\s+/g, '_')}`,
-                          })
-                        }
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
-                        title="Ver Anexo"
-                      >
-                        {t.attachmentUrl.includes('application/pdf') ? (
-                          <FileText className="w-4 h-4" />
-                        ) : (
-                          <ImageIcon className="w-4 h-4" />
-                        )}
-                      </button>
-                    ) : (
-                      <span className="text-zinc-600 text-xs">-</span>
-                    )}
+                    <div className="flex items-center justify-center gap-2">
+                      {t.attachmentUrl ? (
+                        <button
+                          onClick={() =>
+                            setPreviewData({
+                              url: t.attachmentUrl,
+                              fileName: `Comprovante_${t.description.replace(/\s+/g, '_')}`,
+                            })
+                          }
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+                          title="Ver Anexo"
+                        >
+                          {t.attachmentUrl.includes('application/pdf') ? (
+                            <FileText className="w-4 h-4" />
+                          ) : (
+                            <ImageIcon className="w-4 h-4" />
+                          )}
+                        </button>
+                      ) : (
+                        <span className="w-8 h-8 inline-flex items-center justify-center text-zinc-600 text-xs">-</span>
+                      )}
+
+                      {!monthClosed && (
+                        <button
+                          onClick={() => {
+                            setTransactionToEdit(t);
+                            setIsModalOpen(true);
+                          }}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-800 text-zinc-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+                          title="Editar Transação"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -132,8 +151,12 @@ export default function TransactionTable({
       
       <TransactionModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setTransactionToEdit(null);
+        }}
         monthId={monthId}
+        transactionToEdit={transactionToEdit}
       />
 
       <AttachmentPreviewModal

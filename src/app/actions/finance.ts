@@ -165,49 +165,75 @@ export async function addTransaction(formData: FormData) {
   }
 }
 
-export async function updateTransaction(
-  id: string,
-  data: {
-    date?: Date;
-    description?: string;
-    type?: 'IN' | 'OUT';
-    amount?: number;
-    status?: 'PENDING' | 'COMPLETED';
-    attachmentUrl?: string;
+export async function updateTransaction(formData: FormData) {
+  try {
+    const id = formData.get('id') as string;
+    const description = formData.get('description') as string;
+    const type = formData.get('type') as 'IN' | 'OUT';
+    const amountStr = formData.get('amount') as string;
+    const dateStr = formData.get('date') as string;
+    const status = formData.get('status') as 'PENDING' | 'COMPLETED';
+
+    const transaction = await prisma.transaction.findUnique({
+      where: { id },
+      include: { monthBalance: true },
+    });
+
+    if (!transaction || transaction.monthBalance.isClosed) {
+      return { success: false, error: 'Não é possível editar transação de um mês fechado.' };
+    }
+
+    const file = formData.get('file') as File | null;
+    let attachmentUrl = transaction.attachmentUrl; // Keep existing if no new file
+
+    if (file && file.size > 0) {
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const base64Str = buffer.toString('base64');
+      const mimeType = file.type;
+      attachmentUrl = `data:${mimeType};base64,${base64Str}`;
+    }
+
+    const dataToUpdate: any = {};
+    if (description) dataToUpdate.description = description;
+    if (type) dataToUpdate.type = type;
+    if (amountStr) dataToUpdate.amount = parseFloat(amountStr);
+    if (dateStr) dataToUpdate.date = new Date(dateStr);
+    if (status) dataToUpdate.status = status;
+    dataToUpdate.attachmentUrl = attachmentUrl;
+
+    await prisma.transaction.update({
+      where: { id },
+      data: dataToUpdate,
+    });
+
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: any) {
+    console.error('ERRO PRISMA:', error);
+    return { success: false, error: 'Erro de conexão ao atualizar.' };
   }
-) {
-  const transaction = await prisma.transaction.findUnique({
-    where: { id },
-    include: { monthBalance: true },
-  });
-
-  if (!transaction || transaction.monthBalance.isClosed) {
-    throw new Error('Cannot update transaction in a closed month.');
-  }
-
-  await prisma.transaction.update({
-    where: { id },
-    data,
-  });
-
-  revalidatePath('/');
-  return { success: true };
 }
 
 export async function deleteTransaction(id: string) {
-  const transaction = await prisma.transaction.findUnique({
-    where: { id },
-    include: { monthBalance: true },
-  });
+  try {
+    const transaction = await prisma.transaction.findUnique({
+      where: { id },
+      include: { monthBalance: true },
+    });
 
-  if (!transaction || transaction.monthBalance.isClosed) {
-    throw new Error('Cannot delete transaction in a closed month.');
+    if (!transaction || transaction.monthBalance.isClosed) {
+      return { success: false, error: 'Não é possível excluir transação de um mês fechado.' };
+    }
+
+    await prisma.transaction.delete({
+      where: { id },
+    });
+
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: any) {
+    console.error('ERRO PRISMA:', error);
+    return { success: false, error: 'Erro de conexão ao excluir.' };
   }
-
-  await prisma.transaction.delete({
-    where: { id },
-  });
-
-  revalidatePath('/');
-  return { success: true };
 }

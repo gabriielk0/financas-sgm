@@ -2,17 +2,19 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, UploadCloud, FileText } from 'lucide-react';
-import { addTransaction } from '@/app/actions/finance';
+import { X, UploadCloud, FileText, Trash2 } from 'lucide-react';
+import { addTransaction, updateTransaction, deleteTransaction } from '@/app/actions/finance';
 
 export default function TransactionModal({
   isOpen,
   onClose,
   monthId,
+  transactionToEdit,
 }: {
   isOpen: boolean;
   onClose: () => void;
   monthId: string;
+  transactionToEdit?: any;
 }) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -20,6 +22,7 @@ export default function TransactionModal({
     amount: '',
     type: 'OUT' as 'IN' | 'OUT',
     date: new Date().toISOString().split('T')[0],
+    status: 'COMPLETED' as 'COMPLETED' | 'PENDING',
   });
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -29,6 +32,32 @@ export default function TransactionModal({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (transactionToEdit && isOpen) {
+      setFormData({
+        description: transactionToEdit.description,
+        amount: transactionToEdit.amount.toString(),
+        type: transactionToEdit.type,
+        date: new Date(transactionToEdit.date).toISOString().split('T')[0],
+        status: transactionToEdit.status || 'COMPLETED',
+      });
+      if (transactionToEdit.attachmentUrl) {
+        setPreview(transactionToEdit.attachmentUrl);
+      }
+    } else if (isOpen) {
+      // Reset when opening for a new transaction
+      setFormData({
+        description: '',
+        amount: '',
+        type: 'OUT',
+        date: new Date().toISOString().split('T')[0],
+        status: 'COMPLETED',
+      });
+      setFile(null);
+      setPreview(null);
+    }
+  }, [transactionToEdit, isOpen]);
 
   if (!isOpen || !mounted) return null;
 
@@ -51,18 +80,24 @@ export default function TransactionModal({
 
     try {
       const submitData = new FormData();
-      submitData.append('monthId', monthId);
       submitData.append('description', formData.description);
       submitData.append('amount', formData.amount);
       submitData.append('type', formData.type);
       submitData.append('date', formData.date);
+      submitData.append('status', formData.status);
+      
       if (file) {
         submitData.append('file', file);
       }
 
-      await addTransaction(submitData);
+      if (transactionToEdit) {
+        submitData.append('id', transactionToEdit.id);
+        await updateTransaction(submitData);
+      } else {
+        submitData.append('monthId', monthId);
+        await addTransaction(submitData);
+      }
       
-      // Reset
       setFile(null);
       setPreview(null);
       onClose();
@@ -73,13 +108,30 @@ export default function TransactionModal({
     }
   };
 
+  const handleDelete = async () => {
+    if (!transactionToEdit) return;
+    if (confirm('Tem certeza que deseja excluir esta transação?')) {
+      setLoading(true);
+      try {
+        await deleteTransaction(transactionToEdit.id);
+        onClose();
+      } catch (error) {
+        alert('Erro ao excluir transação.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   return createPortal(
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-hidden">
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-zinc-800 shrink-0">
-          <h2 className="text-xl font-semibold text-white">Nova Transação</h2>
+          <h2 className="text-xl font-semibold text-white">
+            {transactionToEdit ? 'Editar Transação' : 'Nova Transação'}
+          </h2>
           <button
             onClick={onClose}
             className="text-zinc-400 hover:text-white transition-colors"
@@ -134,31 +186,58 @@ export default function TransactionModal({
 
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-1">
-                Tipo
+                Tipo e Status
               </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, type: 'IN' })}
-                  className={`py-2 rounded-lg text-sm font-medium border ${
-                    formData.type === 'IN'
-                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
-                      : 'bg-zinc-950 border-zinc-700 text-zinc-400 hover:bg-zinc-800'
-                  }`}
-                >
-                  Entrada
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, type: 'OUT' })}
-                  className={`py-2 rounded-lg text-sm font-medium border ${
-                    formData.type === 'OUT'
-                      ? 'bg-rose-500/20 border-rose-500/50 text-rose-400'
-                      : 'bg-zinc-950 border-zinc-700 text-zinc-400 hover:bg-zinc-800'
-                  }`}
-                >
-                  Saída
-                </button>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, type: 'IN' })}
+                    className={`py-2 rounded-lg text-sm font-medium border ${
+                      formData.type === 'IN'
+                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                        : 'bg-zinc-950 border-zinc-700 text-zinc-400 hover:bg-zinc-800'
+                    }`}
+                  >
+                    Entrada
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, type: 'OUT' })}
+                    className={`py-2 rounded-lg text-sm font-medium border ${
+                      formData.type === 'OUT'
+                        ? 'bg-rose-500/20 border-rose-500/50 text-rose-400'
+                        : 'bg-zinc-950 border-zinc-700 text-zinc-400 hover:bg-zinc-800'
+                    }`}
+                  >
+                    Saída
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, status: 'COMPLETED' })}
+                    className={`py-2 rounded-lg text-sm font-medium border ${
+                      formData.status === 'COMPLETED'
+                        ? 'bg-blue-500/20 border-blue-500/50 text-blue-400'
+                        : 'bg-zinc-950 border-zinc-700 text-zinc-400 hover:bg-zinc-800'
+                    }`}
+                  >
+                    Concluído
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, status: 'PENDING' })}
+                    className={`py-2 rounded-lg text-sm font-medium border ${
+                      formData.status === 'PENDING'
+                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
+                        : 'bg-zinc-950 border-zinc-700 text-zinc-400 hover:bg-zinc-800'
+                    }`}
+                  >
+                    Pendente
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -197,14 +276,28 @@ export default function TransactionModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-zinc-800 shrink-0 flex justify-end bg-zinc-900">
+        <div className="p-4 border-t border-zinc-800 shrink-0 flex justify-between bg-zinc-900">
+          {transactionToEdit ? (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={loading}
+              className="flex items-center gap-2 text-rose-400 hover:text-rose-300 hover:bg-rose-400/10 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="w-4 h-4" />
+              Excluir
+            </button>
+          ) : (
+            <div></div> // Spacer
+          )}
+          
           <button
             type="submit"
             form="transaction-form"
             disabled={loading}
             className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
           >
-            {loading ? 'Salvando...' : 'Salvar Transação'}
+            {loading ? 'Salvando...' : transactionToEdit ? 'Atualizar' : 'Salvar'}
           </button>
         </div>
       </div>
