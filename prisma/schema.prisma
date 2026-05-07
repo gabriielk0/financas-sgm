@@ -1,0 +1,38 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model MonthBalance {
+  id             String        @id @default(uuid())
+  month          Int
+  year           Int
+  initialBalance Float
+  finalBalance   Float         @default(0)
+  isClosed       Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  transactions   Transaction[]
+
+  @@unique([month, year])
+}
+
+model Transaction {
+  id            String       @id @default(uuid())
+  date          DateTime
+  description   String
+  type          String       // "IN" or "OUT"
+  amount        Float
+  status        String       @default("COMPLETED") // "PENDING" or "COMPLETED"
+  attachmentUrl String?      // Can store Base64 string or external URL
+  monthId       String
+  monthBalance  MonthBalance @relation(fields: [monthId], references: [id])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}

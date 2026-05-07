@@ -1,64 +1,135 @@
-import Image from "next/image";
+import { getCurrentMonth, getMonths, getTransactions } from './actions/finance';
+import DashboardStats from '@/components/DashboardStats';
+import Charts from '@/components/Charts';
+import TransactionTable from '@/components/TransactionTable';
+import MonthSelector from '@/components/MonthSelector';
+import { LogOut } from 'lucide-react';
+import { logoutAction } from './actions/auth';
+import { redirect } from 'next/navigation';
 
-export default function Home() {
+export default async function DashboardPage(
+  props: {
+    searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const currentMonth = await getCurrentMonth();
+  const monthsHistory = await getMonths();
+  const view = (searchParams?.view as string) || 'monthly';
+
+  if (!currentMonth && monthsHistory.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-8">
+        <p className="text-zinc-500">Nenhum mês configurado no sistema. Por favor, rode o seed.</p>
+      </div>
+    );
+  }
+
+  // Use the latest open month or the most recent one
+  const paramMonthId = searchParams?.monthId as string | undefined;
+  const activeMonth = paramMonthId
+    ? monthsHistory.find((m) => m.id === paramMonthId) || currentMonth || monthsHistory[0]
+    : currentMonth || monthsHistory[0];
+
+  let transactions: any[] = [];
+  let displayMonthBalance = { ...activeMonth };
+
+  if (view === 'monthly') {
+    transactions = await getTransactions(activeMonth.id);
+  } else if (view === 'semiannual') {
+    const currentIndex = monthsHistory.findIndex((m) => m.id === activeMonth.id);
+    const targetMonths = monthsHistory.slice(currentIndex, currentIndex + 6);
+    const monthIds = targetMonths.map((m) => m.id);
+    
+    // Fetch all transactions for these 6 months
+    const allTxs = await Promise.all(monthIds.map(id => getTransactions(id)));
+    transactions = allTxs.flat();
+
+    // The oldest month in the slice is the initial balance baseline
+    const oldestMonth = targetMonths[targetMonths.length - 1];
+    displayMonthBalance.initialBalance = oldestMonth?.initialBalance || 0;
+  } else if (view === 'annual') {
+    const currentYear = activeMonth.year;
+    const yearMonths = monthsHistory.filter((m) => m.year === currentYear);
+    const monthIds = yearMonths.map((m) => m.id);
+
+    const allTxs = await Promise.all(monthIds.map(id => getTransactions(id)));
+    transactions = allTxs.flat();
+
+    // Find January or the oldest month in the year for the baseline
+    const oldestMonth = yearMonths[yearMonths.length - 1];
+    displayMonthBalance.initialBalance = oldestMonth?.initialBalance || 0;
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="min-h-screen pb-12 relative overflow-hidden">
+      {/* Background elements */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[300px] bg-indigo-500/10 blur-[120px] rounded-full pointer-events-none"></div>
+
+      {/* Header */}
+      <header className="border-b border-zinc-800/50 bg-zinc-950/50 backdrop-blur-xl sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <span className="text-white font-bold">S</span>
+            </div>
+            <h1 className="text-xl font-semibold text-white tracking-tight">Segue-me</h1>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <form
+              action={async () => {
+                'use server';
+                await logoutAction();
+                redirect('/login');
+              }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              <button
+                type="submit"
+                className="text-sm text-zinc-400 hover:text-white flex items-center gap-2 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                Sair
+              </button>
+            </form>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 relative z-10">
+        <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div>
+            <h2 className="text-2xl font-bold text-white">Dashboard Financeiro</h2>
+            <p className="text-zinc-400 mt-1">
+              Visão geral de {activeMonth.month.toString().padStart(2, '0')}/{activeMonth.year}
+            </p>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto bg-zinc-900/80 p-2 rounded-xl border border-zinc-800">
+            <div className="flex items-center gap-2 bg-zinc-950 p-1 rounded-lg w-full sm:w-auto">
+              <a href={`/?view=monthly&monthId=${activeMonth.id}`} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'monthly' ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'}`}>Mensal</a>
+              <a href={`/?view=semiannual&monthId=${activeMonth.id}`} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'semiannual' ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'}`}>Semestral</a>
+              <a href={`/?view=annual&monthId=${activeMonth.id}`} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'annual' ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'}`}>Anual</a>
+            </div>
+            
+            <div className="w-full sm:w-auto border-t sm:border-t-0 sm:border-l border-zinc-700 pt-2 sm:pt-0 sm:pl-4">
+              <MonthSelector monthsHistory={monthsHistory} activeMonthId={activeMonth.id} />
+            </div>
+          </div>
         </div>
+
+        <DashboardStats monthBalance={displayMonthBalance} transactions={transactions} />
+        
+        <Charts monthsHistory={monthsHistory} transactions={transactions} view={view} />
+
+        {view === 'monthly' ? (
+          <TransactionTable transactions={transactions} monthClosed={activeMonth.isClosed} monthId={activeMonth.id} />
+        ) : (
+          <div className="mt-8 p-6 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800 rounded-2xl text-center">
+            <p className="text-zinc-400">Exibição detalhada de transações ocultada nas visões consolidadas.</p>
+          </div>
+        )}
       </main>
     </div>
   );
