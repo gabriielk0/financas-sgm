@@ -1,5 +1,2 @@
-# Ignorar arquivos do SQLite no deploy da Vercel
-dev.db
-dev.db-journal
-*.sqlite
-*.sqlite3
+# .vercelignore
+
