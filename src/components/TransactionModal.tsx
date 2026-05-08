@@ -51,7 +51,7 @@ export default function TransactionModal({
         setPreview(transactionToEdit.attachmentUrl);
       }
     } else if (isOpen) {
-      // Reset when opening for a new transaction
+      // Resetar ao abrir para uma nova transação
       setFormData({
         description: '',
         amount: '',
@@ -131,7 +131,7 @@ export default function TransactionModal({
   return createPortal(
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-hidden">
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
+        {/* Cabeçalho */}
         <div className="flex items-center justify-between p-6 border-b border-zinc-800 shrink-0">
           <h2 className="text-xl font-semibold text-white">
             {transactionToEdit ? 'Editar Transação' : 'Nova Transação'}
@@ -144,7 +144,7 @@ export default function TransactionModal({
           </button>
         </div>
 
-        {/* Scrollable Form */}
+        {/* Formulário com rolagem */}
         <div className="overflow-y-auto flex-1 p-6">
           <form
             id="transaction-form"
@@ -303,7 +303,7 @@ export default function TransactionModal({
           </form>
         </div>
 
-        {/* Footer */}
+        {/* Rodapé */}
         <div className="p-4 border-t border-zinc-800 shrink-0 flex justify-between bg-zinc-900">
           {transactionToEdit ? (
             <button
@@ -316,7 +316,7 @@ export default function TransactionModal({
               Excluir
             </button>
           ) : (
-            <div></div> // Spacer
+            <div></div> // Espaçador
           )}
 
           <button

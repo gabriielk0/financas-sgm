@@ -27,7 +27,7 @@ export default async function ReportPage(
 
   if (view === 'monthly') {
     transactions = await getTransactions(activeMonth.id);
-    // Sort transactions chronologically for the report
+    // Ordenar transações cronologicamente para o relatório
     transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   } else if (view === 'semiannual') {
     const currentIndex = monthsHistory.findIndex((m) => m.id === activeMonth.id);
@@ -76,10 +76,10 @@ export default async function ReportPage(
 
   return (
     <>
-      {/* Script to automatically trigger print dialog */}
+      {/* Script para abrir automaticamente o diálogo de impressão */}
       <script dangerouslySetInnerHTML={{ __html: `window.onload = function() { window.print(); }` }} />
       
-      {/* Global CSS to override dark mode body background during print */}
+      {/* CSS global para sobrescrever o fundo escuro do body durante a impressão */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           body { background-color: white !important; color: black !important; }
@@ -89,10 +89,10 @@ export default async function ReportPage(
 
       <div className="bg-white min-h-screen text-black p-8 font-sans">
         <div className="max-w-4xl mx-auto">
-          {/* Action buttons (hidden on print) */}
+          {/* Botões de ação (ocultos na impressão) */}
           <PrintButton />
 
-          {/* Header */}
+          {/* Cabeçalho */}
           <div className="text-center mb-8 border-b-2 border-black pb-4">
             <h1 className="text-2xl font-bold uppercase tracking-wider">Segue-me</h1>
             <h2 className="text-xl font-semibold mt-1">Prestação de Contas</h2>
@@ -100,13 +100,13 @@ export default async function ReportPage(
             <p className="text-gray-500 text-sm mt-1">Data de Emissão: {format(new Date(), 'dd/MM/yyyy')}</p>
           </div>
 
-          {/* Initial Balance */}
+          {/* Saldo inicial */}
           <div className="flex justify-between items-center bg-gray-100 p-3 rounded font-bold text-lg mb-6 border border-gray-300">
             <span>Saldo Inicial</span>
             <span>{formatCurrency(initialBalance)}</span>
           </div>
 
-          {/* Incomes Table */}
+          {/* Tabela de entradas */}
           <div className="mb-6">
             <h3 className="text-lg font-bold mb-2 uppercase text-green-800 border-b border-green-800 pb-1">1. Entradas (Receitas)</h3>
             <table className="w-full text-left text-sm border-collapse mb-2">
@@ -145,7 +145,7 @@ export default async function ReportPage(
             <span>{formatCurrency(subTotal)}</span>
           </div>
 
-          {/* Expenses Table */}
+          {/* Tabela de saídas */}
           <div className="mb-6">
             <h3 className="text-lg font-bold mb-2 uppercase text-red-800 border-b border-red-800 pb-1">2. Saídas (Despesas)</h3>
             <table className="w-full text-left text-sm border-collapse mb-2">
@@ -178,13 +178,13 @@ export default async function ReportPage(
             </table>
           </div>
 
-          {/* Final Balance */}
+          {/* Saldo final */}
           <div className="flex justify-between items-center bg-gray-200 p-4 rounded font-bold text-xl mt-8 border border-gray-400">
             <span>Saldo Final do Período</span>
             <span>{formatCurrency(finalBalance)}</span>
           </div>
 
-          {/* Signatures */}
+          {/* Assinaturas */}
           <div className="mt-24 grid grid-cols-2 gap-16 text-center" style={{ pageBreakInside: 'avoid' }}>
             <div>
               <div className="border-t border-black pt-2 mx-4">

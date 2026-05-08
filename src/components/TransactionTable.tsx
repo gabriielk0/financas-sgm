@@ -39,7 +39,7 @@ export default function TransactionTable({
     if (typeFilter === 'IN' || typeFilter === 'OUT') {
       return t.type === typeFilter;
     }
-    return true; // if no filter or invalid filter, return all
+    return true; // se não houver filtro ou ele for inválido, retorna tudo
   });
 
   const formatCurrency = (value: number) =>
@@ -219,7 +219,7 @@ export default function TransactionTable({
         fileName={previewData.fileName}
       />
 
-      {/* Confirm Payment Modal */}
+      {/* Modal de confirmação de pagamento */}
       {paymentToConfirm && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
@@ -259,7 +259,7 @@ export default function TransactionTable({
         </div>
       )}
 
-      {/* Close Month Modal */}
+      {/* Modal de fechamento de mês */}
       {isCloseMonthModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
@@ -302,7 +302,7 @@ export default function TransactionTable({
         </div>
       )}
 
-      {/* Reopen Month Modal */}
+      {/* Modal de reabertura de mês */}
       {isReopenMonthModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">

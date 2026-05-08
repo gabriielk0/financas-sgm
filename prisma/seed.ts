@@ -23,7 +23,7 @@ async function main() {
   const currentYear = currentDate.getFullYear();
   const currentMonthNum = currentDate.getMonth() + 1; // 1-12
 
-  // Generate last 12 months in chronological order
+  // Gerar os últimos 12 meses em ordem cronológica
   const monthsToGenerate = [];
   for (let i = 11; i >= 0; i--) {
     const d = new Date(currentYear, currentMonthNum - 1 - i, 1);
@@ -34,22 +34,22 @@ async function main() {
     });
   }
 
-  let runningBalance = 5000.0; // Saldo Inicial
+  let runningBalance = 5000.0; // Saldo inicial
 
   for (const m of monthsToGenerate) {
     const isClosed = !m.isCurrent;
     
-    // Generate 10 to 15 transactions
+    // Gerar de 10 a 15 transações
     const numTransactions = Math.floor(Math.random() * 6) + 10;
     const transactions = [];
     let totalIn = 0;
     let totalOut = 0;
 
     for (let j = 0; j < numTransactions; j++) {
-      const isTypeIn = Math.random() > 0.4; // 60% chance of IN
+      const isTypeIn = Math.random() > 0.4; // 60% de chance de ser IN
       const amount = isTypeIn 
-        ? Math.floor(Math.random() * 1000) + 100 // R$ 100 to R$ 1100
-        : Math.floor(Math.random() * 600) + 50;  // R$ 50 to R$ 650
+        ? Math.floor(Math.random() * 1000) + 100 // R$ 100 a R$ 1100
+        : Math.floor(Math.random() * 600) + 50;  // R$ 50 a R$ 650
 
       const descList = isTypeIn ? IN_DESC : OUT_DESC;
       const description = descList[Math.floor(Math.random() * descList.length)];
@@ -67,7 +67,7 @@ async function main() {
       });
     }
 
-    // Sort transactions by date
+    // Ordenar transações por data
     transactions.sort((a, b) => a.date.getTime() - b.date.getTime());
 
     const finalBalance = runningBalance + totalIn - totalOut;
@@ -77,7 +77,7 @@ async function main() {
         month: m.month,
         year: m.year,
         initialBalance: runningBalance,
-        finalBalance: isClosed ? finalBalance : finalBalance, // For current month it updates dynamically but let's set it
+        finalBalance: isClosed ? finalBalance : finalBalance, // No mês atual atualiza dinamicamente, mas já definimos aqui
         isClosed: isClosed,
       },
     });
@@ -92,7 +92,7 @@ async function main() {
     }
 
     if (isClosed) {
-      runningBalance = finalBalance; // Carry over to next month
+      runningBalance = finalBalance; // Levar saldo para o próximo mês
     }
   }
 

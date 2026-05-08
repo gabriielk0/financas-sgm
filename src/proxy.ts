@@ -6,22 +6,22 @@ export async function proxy(request: NextRequest) {
   const token = request.cookies.get('auth_token')?.value;
   const isLoginPage = request.nextUrl.pathname === '/login';
 
-  // If no token and not on login page, redirect to login
+  // Se não houver token e não estiver na página de login, redirecionar para login
   if (!token && !isLoginPage) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // If token exists, verify it
+  // Se existir token, validar
   if (token) {
     const payload = await verifyToken(token);
     if (!payload && !isLoginPage) {
-      // Invalid token
+      // Token inválido
       const response = NextResponse.redirect(new URL('/login', request.url));
       response.cookies.delete('auth_token');
       return response;
     }
 
-    // If valid token and trying to access login page, redirect to home
+    // Se o token for válido e estiver tentando acessar login, redirecionar para home
     if (payload && isLoginPage) {
       return NextResponse.redirect(new URL('/', request.url));
     }

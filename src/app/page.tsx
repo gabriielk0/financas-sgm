@@ -19,8 +19,8 @@ export default async function DashboardPage(
   const view = (searchParams?.view as string) || 'monthly';
 
   if (!currentMonth && monthsHistory.length === 0) {
-    // This should theoretically not happen anymore due to First Access logic
-    // but we keep a fallback just in case the DB connection totally fails.
+    // Teoricamente isso não deve mais acontecer por causa da lógica de primeiro acesso,
+    // mas mantemos um fallback caso a conexão com o banco falhe totalmente.
     return (
       <div className="min-h-screen flex items-center justify-center p-8 bg-zinc-950 text-center">
         <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-xl max-w-md">
@@ -33,7 +33,7 @@ export default async function DashboardPage(
     );
   }
 
-  // Use the latest open month or the most recent one
+  // Usar o último mês aberto ou o mais recente
   const paramMonthId = searchParams?.monthId as string | undefined;
   const activeMonth = paramMonthId
     ? monthsHistory.find((m) => m.id === paramMonthId) || currentMonth || monthsHistory[0]
@@ -49,11 +49,11 @@ export default async function DashboardPage(
     const targetMonths = monthsHistory.slice(currentIndex, currentIndex + 6);
     const monthIds = targetMonths.map((m) => m.id);
     
-    // Fetch all transactions for these 6 months
+    // Buscar todas as transações desses 6 meses
     const allTxs = await Promise.all(monthIds.map(id => getTransactions(id)));
     transactions = allTxs.flat();
 
-    // The oldest month in the slice is the initial balance baseline
+    // O mês mais antigo do recorte é a base para o saldo inicial
     const oldestMonth = targetMonths[targetMonths.length - 1];
     displayMonthBalance.initialBalance = oldestMonth?.initialBalance || 0;
   } else if (view === 'annual') {
@@ -64,17 +64,17 @@ export default async function DashboardPage(
     const allTxs = await Promise.all(monthIds.map(id => getTransactions(id)));
     transactions = allTxs.flat();
 
-    // Find January or the oldest month in the year for the baseline
+    // Encontrar janeiro ou o mês mais antigo do ano para a base
     const oldestMonth = yearMonths[yearMonths.length - 1];
     displayMonthBalance.initialBalance = oldestMonth?.initialBalance || 0;
   }
 
   return (
     <div className="min-h-screen pb-12 relative overflow-hidden">
-      {/* Background elements */}
+      {/* Elementos de fundo */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[300px] bg-indigo-500/10 blur-[120px] rounded-full pointer-events-none"></div>
 
-      {/* Header */}
+      {/* Cabeçalho */}
       <header className="border-b border-zinc-800/50 bg-zinc-950/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -104,7 +104,7 @@ export default async function DashboardPage(
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Conteúdo principal */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 relative z-10">
         <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div>

@@ -17,7 +17,7 @@ import {
 } from 'recharts';
 import { MonthBalance, Transaction } from '@prisma/client';
 
-const COLORS = ['#34d399', '#fb7185']; // emerald-400 and rose-400
+const COLORS = ['#34d399', '#fb7185']; // emerald-400 e rose-400
 
 export default function Charts({
   monthsHistory,
@@ -28,7 +28,7 @@ export default function Charts({
   transactions: Transaction[];
   view?: string;
 }) {
-  // Line Chart Data
+  // Dados do gráfico de linha
   const lineData = monthsHistory
     .slice()
     .reverse()
@@ -43,7 +43,7 @@ export default function Charts({
       };
     });
 
-  // Pie Chart Data
+  // Dados do gráfico de pizza
   const totalIn = transactions
     .filter((t) => t.type === 'IN' && t.status === 'COMPLETED')
     .reduce((acc, t) => acc + t.amount, 0);
@@ -57,7 +57,7 @@ export default function Charts({
     { name: 'Saídas', value: totalOut },
   ];
 
-  // Bar Chart Data (For Annual View)
+  // Dados do gráfico de barras (para visão anual)
   const barData =
     view === 'annual'
       ? Object.values(
@@ -73,7 +73,7 @@ export default function Charts({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-8">
-      {/* Line Chart */}
+      {/* Gráfico de linha */}
       <div className="lg:col-span-2 p-6 rounded-2xl border border-zinc-800 bg-zinc-900/50 backdrop-blur-sm shadow-lg">
         <h3 className="text-lg font-semibold text-white mb-6">Evolução do Saldo</h3>
         <div className="h-72 w-full">
@@ -110,7 +110,7 @@ export default function Charts({
         </div>
       </div>
 
-      {/* Pie or Bar Chart */}
+      {/* Gráfico de pizza ou barras */}
       <div className="p-6 rounded-2xl border border-zinc-800 bg-zinc-900/50 backdrop-blur-sm shadow-lg">
         <h3 className="text-lg font-semibold text-white mb-6">
           {view === 'annual' ? 'Comparativo Mensal' : 'Distribuição Mensal'}

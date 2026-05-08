@@ -22,7 +22,7 @@ export default function AttachmentPreviewModal({
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-4xl h-[85vh] flex flex-col shadow-2xl overflow-hidden">
         
-        {/* Header */}
+        {/* Cabeçalho */}
         <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/50">
           <h3 className="text-lg font-semibold text-white truncate max-w-[70%]">
             Visualização de Anexo
@@ -45,7 +45,7 @@ export default function AttachmentPreviewModal({
           </div>
         </div>
 
-        {/* Content */}
+        {/* Conteúdo */}
         <div className="flex-1 bg-zinc-950/80 p-4 flex items-center justify-center overflow-auto relative">
           {isPdf ? (
             <iframe

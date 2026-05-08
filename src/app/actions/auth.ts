@@ -10,14 +10,14 @@ export async function loginAction(password: string) {
     if (password === APP_PASSWORD) {
       const token = await signToken({ authenticated: true });
       
-      // Set cookie
+      // Definir cookie
       const cookieStore = await cookies();
       cookieStore.set('auth_token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
-        maxAge: 60 * 60 * 24, // 24 hours
+        maxAge: 60 * 60 * 24, // 24 horas
       });
 
       return { success: true };

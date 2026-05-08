@@ -1,4 +1,4 @@
-// This is your Prisma schema file
+// Este é o arquivo de schema do Prisma
 
 generator client {
   provider = "prisma-client-js"
@@ -28,10 +28,10 @@ model Transaction {
   id            String       @id @default(uuid())
   date          DateTime
   description   String
-  type          String       // "IN" or "OUT"
+  type          String       // "IN" ou "OUT"
   amount        Float
-  status        String       @default("COMPLETED") // "PENDING" or "COMPLETED"
-  attachmentUrl String?      // Can store Base64 string or external URL
+  status        String       @default("COMPLETED") // "PENDING" ou "COMPLETED"
+  attachmentUrl String?      // Pode armazenar string Base64 ou URL externa
   monthId       String
   monthBalance  MonthBalance @relation(fields: [monthId], references: [id])
   createdAt     DateTime     @default(now())

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 
 // ==========================
-// MONTH ACTIONS
+// ACOES DE MES
 // ==========================
 
 export async function getMonths() {
@@ -28,7 +28,7 @@ export async function getCurrentMonth() {
     
     if (months.length > 0) return months[0];
 
-    // First access scenario: create the first month automatically
+    // Cenário de primeiro acesso: criar o primeiro mês automaticamente
     const allHistory = await prisma.monthBalance.count();
     if (allHistory === 0) {
       const now = new Date();
@@ -61,7 +61,7 @@ export async function closeMonth(monthId: string) {
     throw new Error('Month not found or already closed.');
   }
 
-  // Calculate final balance dynamically based on completed transactions
+  // Calcular saldo final dinamicamente com base nas transações concluídas
   const totalIn = currentMonth.transactions
     .filter((t) => t.type === 'IN' && t.status === 'COMPLETED')
     .reduce((acc, t) => acc + t.amount, 0);
@@ -72,7 +72,7 @@ export async function closeMonth(monthId: string) {
 
   const finalBalance = currentMonth.initialBalance + totalIn - totalOut;
 
-  // Determine next month and year
+  // Determinar próximo mês e ano
   let nextMonthNumber = currentMonth.month + 1;
   let nextYear = currentMonth.year;
   if (nextMonthNumber > 12) {
@@ -80,7 +80,7 @@ export async function closeMonth(monthId: string) {
     nextYear++;
   }
 
-  // Transaction to close current and open next
+  // Transação para fechar o mês atual e abrir o próximo
   await prisma.$transaction([
     prisma.monthBalance.update({
       where: { id: monthId },
@@ -111,7 +111,7 @@ export async function reopenMonth(monthId: string) {
       return { success: false, error: 'Mês não encontrado ou já está aberto.' };
     }
 
-    // Identify the next month
+    // Identificar o próximo mês
     let nextMonthNumber = month.month + 1;
     let nextYear = month.year;
     if (nextMonthNumber > 12) {
@@ -119,7 +119,7 @@ export async function reopenMonth(monthId: string) {
       nextYear++;
     }
 
-    // Check if the next month exists and has transactions
+    // Verificar se o próximo mês existe e possui transações
     const nextMonth = await prisma.monthBalance.findUnique({
       where: { month_year: { month: nextMonthNumber, year: nextYear } },
       include: { transactions: true }
@@ -133,7 +133,7 @@ export async function reopenMonth(monthId: string) {
         return { success: false, error: 'Não é possível reabrir este mês pois o mês seguinte já possui transações. Exclua ou mova as transações do mês seguinte primeiro.' };
       }
       
-      // Delete the next month since it's empty
+      // Excluir o próximo mês porque está vazio
       await prisma.$transaction([
         prisma.monthBalance.delete({
           where: { id: nextMonth.id }
@@ -144,7 +144,7 @@ export async function reopenMonth(monthId: string) {
         })
       ]);
     } else {
-      // Just reopen
+      // Apenas reabrir
       await prisma.monthBalance.update({
         where: { id: monthId },
         data: { isClosed: false }
@@ -160,7 +160,7 @@ export async function reopenMonth(monthId: string) {
 }
 
 // ==========================
-// TRANSACTION ACTIONS
+// ACOES DE TRANSACAO
 // ==========================
 
 export async function getTransactions(monthId: string) {
@@ -242,7 +242,7 @@ export async function updateTransaction(formData: FormData) {
     }
 
     const file = formData.get('file') as File | null;
-    let attachmentUrl = transaction.attachmentUrl; // Keep existing if no new file
+    let attachmentUrl = transaction.attachmentUrl; // Manter o atual se não houver novo arquivo
 
     if (file && file.size > 0) {
       const arrayBuffer = await file.arrayBuffer();
