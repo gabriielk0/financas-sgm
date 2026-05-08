@@ -117,11 +117,25 @@ export default function TransactionTable({
               filteredTransactions.map((t) => (
                 <tr key={t.id} className="hover:bg-zinc-800/30 transition-colors">
                   <td className="px-6 py-4 text-sm text-zinc-300">
-                    {t.date ? (
-                      format(new Date(`${t.date}T12:00:00`), 'dd/MM/yyyy')
-                    ) : (
-                      'Data inválida'
-                    )}
+                    {(() => {
+                      if (!t.date) return "Sem data"; // Verifica se o campo existe
+                      
+                      try {
+                        const dateObj = new Date(t.date);
+                        
+                        // Verifica se o JavaScript considera a data como válida
+                        if (isNaN(dateObj.getTime())) return "Data inválida";
+                  
+                        // Ajuste de fuso horário seguro para strings simples YYYY-MM-DD
+                        const finalDate = typeof t.date === 'string' && t.date.length === 10
+                          ? new Date(`${t.date}T12:00:00`)
+                          : dateObj;
+                  
+                        return format(finalDate, 'dd/MM/yyyy');
+                      } catch (e) {
+                        return "Erro na data";
+                      }
+                    })()}
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-zinc-100">
                     {t.description}
