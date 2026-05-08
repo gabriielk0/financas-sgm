@@ -58,7 +58,7 @@ export async function closeMonth(monthId: string) {
   });
 
   if (!currentMonth || currentMonth.isClosed) {
-    throw new Error('Month not found or already closed.');
+   return { success: false, error: 'Mês não encontrado ou já está fechado.' };
   }
 
   // Calcular saldo final dinamicamente com base nas transações concluídas
@@ -80,25 +80,30 @@ export async function closeMonth(monthId: string) {
     nextYear++;
   }
 
-  // Transação para fechar o mês atual e abrir o próximo
-  await prisma.$transaction([
-    prisma.monthBalance.update({
-      where: { id: monthId },
-      data: { isClosed: true, finalBalance },
-    }),
-    prisma.monthBalance.create({
-      data: {
-        month: nextMonthNumber,
-        year: nextYear,
-        initialBalance: finalBalance,
-        finalBalance: finalBalance,
-        isClosed: false,
-      },
-    }),
-  ]);
+  try {
+    // Transação para fechar o mês atual e abrir o próximo
+    await prisma.$transaction([
+      prisma.monthBalance.update({
+        where: { id: monthId },
+        data: { isClosed: true, finalBalance },
+      }),
+      prisma.monthBalance.create({
+        data: {
+          month: nextMonthNumber,
+          year: nextYear,
+          initialBalance: finalBalance,
+          finalBalance: finalBalance,
+          isClosed: false,
+        },
+      }),
+    ]);
 
   revalidatePath('/');
-  return { success: true };
+    return { success: true };
+  } catch (error: unknown) {
+    console.error('ERRO AO FECHAR MÊS:', error);
+    return { success: false, error: 'Não foi possível fechar o mês. Verifique se já existe um mês aberto para o período seguinte.' };
+  }
 }
 
 export async function reopenMonth(monthId: string) {
