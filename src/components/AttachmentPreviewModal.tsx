@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Download } from 'lucide-react';
 
@@ -15,13 +14,7 @@ export default function AttachmentPreviewModal({
   attachmentUrl: string | null;
   fileName?: string;
 }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!isOpen || !attachmentUrl || !mounted) return null;
+  if (!isOpen || !attachmentUrl || typeof document === 'undefined') return null;
 
   const isPdf = attachmentUrl.includes('application/pdf');
 

@@ -31,21 +31,21 @@ export default function TransactionModal({
   });
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
     if (transactionToEdit && isOpen) {
+      const type = transactionToEdit.type === 'IN' ? 'IN' : 'OUT';
+      const status =
+        transactionToEdit.status === 'PENDING' ? 'PENDING' : 'COMPLETED';
+
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         description: transactionToEdit.description,
         amount: transactionToEdit.amount.toString(),
-        type: transactionToEdit.type,
+        type,
         date: new Date(transactionToEdit.date).toISOString().split('T')[0],
-        status: transactionToEdit.status || 'COMPLETED',
+        status,
       });
       if (transactionToEdit.attachmentUrl) {
         setPreview(transactionToEdit.attachmentUrl);
@@ -64,7 +64,7 @@ export default function TransactionModal({
     }
   }, [transactionToEdit, isOpen]);
 
-  if (!isOpen || !mounted) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -106,7 +106,7 @@ export default function TransactionModal({
       setFile(null);
       setPreview(null);
       onClose();
-    } catch (error) {
+    } catch {
       alert('Erro ao salvar transação.');
     } finally {
       setLoading(false);
@@ -120,7 +120,7 @@ export default function TransactionModal({
       try {
         await deleteTransaction(transactionToEdit.id);
         onClose();
-      } catch (error) {
+      } catch {
         alert('Erro ao excluir transação.');
       } finally {
         setLoading(false);

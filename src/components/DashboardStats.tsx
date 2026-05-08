@@ -2,13 +2,14 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowDownIcon, ArrowUpIcon, DollarSign, Wallet } from 'lucide-react';
+import { MonthBalance, Transaction } from '@prisma/client';
 
 export default function DashboardStats({
   monthBalance,
   transactions,
 }: {
-  monthBalance: any;
-  transactions: any[];
+  monthBalance: MonthBalance;
+  transactions: Transaction[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();

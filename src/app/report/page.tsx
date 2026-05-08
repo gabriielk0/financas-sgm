@@ -1,6 +1,7 @@
 import { getCurrentMonth, getMonths, getTransactions } from '../actions/finance';
 import { format } from 'date-fns';
 import PrintButton from '@/components/PrintButton';
+import { Transaction } from '@prisma/client';
 
 export default async function ReportPage(
   props: {
@@ -21,7 +22,7 @@ export default async function ReportPage(
     ? monthsHistory.find((m) => m.id === paramMonthId) || currentMonth || monthsHistory[0]
     : currentMonth || monthsHistory[0];
 
-  let transactions: any[] = [];
+  let transactions: Transaction[] = [];
   let initialBalance = activeMonth.initialBalance;
 
   if (view === 'monthly') {

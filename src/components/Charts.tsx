@@ -15,6 +15,7 @@ import {
   BarChart,
   Bar
 } from 'recharts';
+import { MonthBalance, Transaction } from '@prisma/client';
 
 const COLORS = ['#34d399', '#fb7185']; // emerald-400 and rose-400
 
@@ -23,8 +24,8 @@ export default function Charts({
   transactions,
   view = 'monthly',
 }: {
-  monthsHistory: any[];
-  transactions: any[];
+  monthsHistory: MonthBalance[];
+  transactions: Transaction[];
   view?: string;
 }) {
   // Line Chart Data
@@ -57,15 +58,18 @@ export default function Charts({
   ];
 
   // Bar Chart Data (For Annual View)
-  const barData = view === 'annual' ? Object.values(
-    transactions.reduce((acc, t) => {
+  const barData =
+    view === 'annual'
+      ? Object.values(
+          transactions.reduce<Record<string, { name: string; Entradas: number; Saídas: number }>>((acc, t) => {
       const monthKey = new Date(t.date).toLocaleString('pt-BR', { month: 'short' });
       if (!acc[monthKey]) acc[monthKey] = { name: monthKey, Entradas: 0, Saídas: 0 };
       if (t.type === 'IN' && t.status === 'COMPLETED') acc[monthKey].Entradas += t.amount;
       if (t.type === 'OUT' && t.status === 'COMPLETED') acc[monthKey].Saídas += t.amount;
       return acc;
-    }, {})
-  ).reverse() : [];
+          }, {}),
+        ).reverse()
+      : [];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-8">
@@ -116,13 +120,13 @@ export default function Charts({
             <p className="text-zinc-500 text-sm">Sem dados para este período.</p>
           ) : view === 'annual' ? (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData as any[]} margin={{ top: 5, right: 0, bottom: 5, left: 0 }}>
+              <BarChart data={barData} margin={{ top: 5, right: 0, bottom: 5, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" vertical={false} />
                 <XAxis dataKey="name" stroke="#a1a1aa" fontSize={10} tickLine={false} axisLine={false} />
                 <YAxis hide />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '12px', color: '#fff' }}
-                  formatter={(value: any) => `R$ ${Number(value).toFixed(2)}`}
+                  formatter={(value) => `R$ ${Number(Array.isArray(value) ? value[0] : (value ?? 0)).toFixed(2)}`}
                 />
                 <Legend verticalAlign="bottom" height={36} iconType="circle" />
                 <Bar dataKey="Entradas" fill="#34d399" radius={[4, 4, 0, 0]} />
@@ -147,7 +151,7 @@ export default function Charts({
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: any) => `R$ ${Number(value).toFixed(2)}`}
+                  formatter={(value) => `R$ ${Number(Array.isArray(value) ? value[0] : (value ?? 0)).toFixed(2)}`}
                   contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '12px', color: '#fff' }}
                 />
                 <Legend verticalAlign="bottom" height={36} iconType="circle" formatter={(value) => <span className="text-zinc-300 text-sm">{value}</span>} />

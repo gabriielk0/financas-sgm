@@ -6,6 +6,7 @@ import MonthSelector from '@/components/MonthSelector';
 import { LogOut, Printer } from 'lucide-react';
 import { logoutAction } from './actions/auth';
 import { redirect } from 'next/navigation';
+import { MonthBalance, Transaction } from '@prisma/client';
 
 export default async function DashboardPage(
   props: {
@@ -38,8 +39,8 @@ export default async function DashboardPage(
     ? monthsHistory.find((m) => m.id === paramMonthId) || currentMonth || monthsHistory[0]
     : currentMonth || monthsHistory[0];
 
-  let transactions: any[] = [];
-  let displayMonthBalance = { ...activeMonth };
+  let transactions: Transaction[] = [];
+  const displayMonthBalance: MonthBalance = { ...activeMonth };
 
   if (view === 'monthly') {
     transactions = await getTransactions(activeMonth.id);

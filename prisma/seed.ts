@@ -20,13 +20,13 @@ async function main() {
   await prisma.monthBalance.deleteMany();
 
   const currentDate = new Date();
-  let currentYear = currentDate.getFullYear();
-  let currentMonthNum = currentDate.getMonth() + 1; // 1-12
+  const currentYear = currentDate.getFullYear();
+  const currentMonthNum = currentDate.getMonth() + 1; // 1-12
 
   // Generate last 12 months in chronological order
   const monthsToGenerate = [];
   for (let i = 11; i >= 0; i--) {
-    let d = new Date(currentYear, currentMonthNum - 1 - i, 1);
+    const d = new Date(currentYear, currentMonthNum - 1 - i, 1);
     monthsToGenerate.push({
       year: d.getFullYear(),
       month: d.getMonth() + 1,

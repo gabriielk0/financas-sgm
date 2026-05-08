@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
-import { FileText, Plus, ExternalLink, Image as ImageIcon, Edit2, CheckCircle, AlertTriangle, CalendarCheck, FolderOpen } from 'lucide-react';
+import { FileText, Plus, Image as ImageIcon, Edit2, CheckCircle, AlertTriangle, CalendarCheck, FolderOpen } from 'lucide-react';
 import TransactionModal from './TransactionModal';
 import AttachmentPreviewModal from './AttachmentPreviewModal';
 import { completePayment, closeMonth, reopenMonth } from '@/app/actions/finance';
@@ -230,7 +230,7 @@ export default function TransactionTable({
               <div>
                 <h3 className="text-lg font-semibold text-white">Confirmar Pagamento</h3>
                 <p className="text-zinc-400 text-sm mt-1">
-                  Deseja marcar a transação <strong className="text-zinc-200">"{paymentToConfirm.description}"</strong> como concluída?
+                  Deseja marcar a transação <strong className="text-zinc-200">&quot;{paymentToConfirm.description}&quot;</strong> como concluída?
                 </p>
               </div>
               <div className="flex gap-3 w-full mt-4">
