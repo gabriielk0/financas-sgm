@@ -113,7 +113,7 @@ export default function TransactionTable({
               filteredTransactions.map((t) => (
                 <tr key={t.id} className="hover:bg-zinc-800/30 transition-colors">
                   <td className="px-6 py-4 text-sm text-zinc-300">
-                    {format(new Date(t.date), 'dd/MM/yyyy')}
+                    {format(new Date(`${t.date}T12:00:00`), 'dd/MM/yyyy')}
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-zinc-100">
                     {t.description}
