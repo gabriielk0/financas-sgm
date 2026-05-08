@@ -118,20 +118,25 @@ export default function TransactionTable({
                 <tr key={t.id} className="hover:bg-zinc-800/30 transition-colors">
                   <td className="px-6 py-4 text-sm text-zinc-300">
                     {(() => {
-                      try {
-                        if (!t.date) return "---";
-                        
-                        const d = new Date(t.date);
-                        if (isNaN(d.getTime())) return "Data Inválida";
+                      // 1. Verifica se a data existe
+                      if (!t.date) return <span className="text-rose-500">Sem data</span>;
                   
-                        // Extrai dia, mês e ano ignorando fuso horário (UTC)
+                      try {
+                        const d = new Date(t.date);
+                        
+                        // 2. Verifica se o objeto Date resultante é válido
+                        if (isNaN(d.getTime())) {
+                          return <span className="text-rose-500">Data Inválida</span>;
+                        }
+                  
+                        // 3. Exibe apenas a data (dia/mês/ano) usando UTC para evitar erros de fuso
                         const dia = String(d.getUTCDate()).padStart(2, '0');
                         const mes = String(d.getUTCMonth() + 1).padStart(2, '0');
                         const ano = d.getUTCFullYear();
                   
                         return `${dia}/${mes}/${ano}`;
                       } catch (e) {
-                        return "Erro na data";
+                        return <span className="text-rose-500">Erro</span>;
                       }
                     })()}
                   </td>
