@@ -21,6 +21,21 @@ export default async function ReportPage(
   const activeMonth = paramMonthId
     ? monthsHistory.find((m) => m.id === paramMonthId) || currentMonth || monthsHistory[0]
     : currentMonth || monthsHistory[0];
+  
+if (!activeMonth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-8 bg-zinc-950 text-center">
+        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-xl max-w-md">
+          <h2 className="text-xl font-bold text-white mb-2">Dados indisponíveis</h2>
+          <p className="text-zinc-400">
+            Não foi possível determinar o mês ativo no momento. Tente novamente em instantes.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  
 
   let transactions: Transaction[] = [];
   let initialBalance = activeMonth.initialBalance;
