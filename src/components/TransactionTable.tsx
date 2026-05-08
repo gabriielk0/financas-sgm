@@ -28,6 +28,7 @@ export default function TransactionTable({
   const [isCompleting, setIsCompleting] = useState(false);
   const [isCloseMonthModalOpen, setIsCloseMonthModalOpen] = useState(false);
   const [isClosingMonth, setIsClosingMonth] = useState(false);
+  const [closeMonthError, setCloseMonthError] = useState<string | null>(null);
   const [isReopenMonthModalOpen, setIsReopenMonthModalOpen] = useState(false);
   const [isReopeningMonth, setIsReopeningMonth] = useState(false);
   const [reopenError, setReopenError] = useState<string | null>(null);
@@ -56,7 +57,10 @@ export default function TransactionTable({
         {!monthClosed && (
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <button
-              onClick={() => setIsCloseMonthModalOpen(true)}
+              onClick={() => {
+                setCloseMonthError(null);
+                setIsCloseMonthModalOpen(true);
+              }}
               className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700"
             >
               <CalendarCheck className="w-4 h-4 text-emerald-400" />
@@ -272,6 +276,12 @@ export default function TransactionTable({
                 <p className="text-zinc-400 text-sm mt-2">
                   Ao fechar o mês, o saldo final será calculado apenas com as transações <strong className="text-emerald-400">concluídas</strong> e um novo mês será iniciado. Transações pendentes permanecerão pendentes no histórico.
                 </p>
+                {closeMonthError && (
+                  <div className="mt-3 p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-400 text-sm text-left">
+                    <AlertTriangle className="w-4 h-4 inline mr-2" />
+                    {closeMonthError}
+                  </div>
+                )}
                 <p className="text-zinc-300 text-sm mt-3 font-medium">
                   Tem certeza que deseja fechar este mês agora?
                 </p>
@@ -287,9 +297,19 @@ export default function TransactionTable({
                 <button
                   onClick={async () => {
                     setIsClosingMonth(true);
-                    await closeMonth(monthId);
-                    setIsClosingMonth(false);
-                    setIsCloseMonthModalOpen(false);
+                    setCloseMonthError(null);
+                    try {
+                      const res = await closeMonth(monthId);
+                      if (res?.error) {
+                        setCloseMonthError(res.error);
+                      } else {
+                        setIsCloseMonthModalOpen(false);
+                      }
+                    } catch {
+                      setCloseMonthError('Ocorreu um erro inesperado ao fechar o mês.');
+                    } finally {
+                      setIsClosingMonth(false);
+                    }
                   }}
                   disabled={isClosingMonth}
                   className="flex-1 px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition-colors disabled:opacity-50 shadow-[0_0_15px_rgba(79,70,229,0.2)]"
