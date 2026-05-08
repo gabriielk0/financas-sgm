@@ -3,7 +3,7 @@ import DashboardStats from '@/components/DashboardStats';
 import Charts from '@/components/Charts';
 import TransactionTable from '@/components/TransactionTable';
 import MonthSelector from '@/components/MonthSelector';
-import { LogOut } from 'lucide-react';
+import { LogOut, Printer } from 'lucide-react';
 import { logoutAction } from './actions/auth';
 import { redirect } from 'next/navigation';
 
@@ -120,8 +120,19 @@ export default async function DashboardPage(
               <a href={`/?view=annual&monthId=${activeMonth.id}`} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'annual' ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'}`}>Anual</a>
             </div>
             
-            <div className="w-full sm:w-auto border-t sm:border-t-0 sm:border-l border-zinc-700 pt-2 sm:pt-0 sm:pl-4">
+            <div className="w-full sm:w-auto border-t sm:border-t-0 sm:border-l border-zinc-700 pt-2 sm:pt-0 sm:pl-4 flex gap-2 items-center">
               <MonthSelector monthsHistory={monthsHistory} activeMonthId={activeMonth.id} />
+              
+              <a 
+                href={`/report?view=${view}&monthId=${activeMonth.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white p-2 sm:px-4 sm:py-2 rounded-xl text-sm font-medium transition-all shadow-md"
+                title="Exportar PDF"
+              >
+                <Printer className="w-4 h-4" />
+                <span className="hidden sm:inline">Exportar PDF</span>
+              </a>
             </div>
           </div>
         </div>

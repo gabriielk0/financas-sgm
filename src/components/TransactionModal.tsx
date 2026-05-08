@@ -3,7 +3,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, UploadCloud, FileText, Trash2 } from 'lucide-react';
-import { addTransaction, updateTransaction, deleteTransaction } from '@/app/actions/finance';
+import {
+  addTransaction,
+  updateTransaction,
+  deleteTransaction,
+} from '@/app/actions/finance';
+import { Transaction } from '@prisma/client';
 
 export default function TransactionModal({
   isOpen,
@@ -14,7 +19,7 @@ export default function TransactionModal({
   isOpen: boolean;
   onClose: () => void;
   monthId: string;
-  transactionToEdit?: any;
+  transactionToEdit?: Transaction | null;
 }) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -65,7 +70,7 @@ export default function TransactionModal({
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
-      
+
       if (selectedFile.type.startsWith('image/')) {
         setPreview(URL.createObjectURL(selectedFile));
       } else {
@@ -85,7 +90,7 @@ export default function TransactionModal({
       submitData.append('type', formData.type);
       submitData.append('date', formData.date);
       submitData.append('status', formData.status);
-      
+
       if (file) {
         submitData.append('file', file);
       }
@@ -97,7 +102,7 @@ export default function TransactionModal({
         submitData.append('monthId', monthId);
         await addTransaction(submitData);
       }
-      
+
       setFile(null);
       setPreview(null);
       onClose();
@@ -126,7 +131,6 @@ export default function TransactionModal({
   return createPortal(
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-hidden">
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
-        
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-zinc-800 shrink-0">
           <h2 className="text-xl font-semibold text-white">
@@ -142,7 +146,11 @@ export default function TransactionModal({
 
         {/* Scrollable Form */}
         <div className="overflow-y-auto flex-1 p-6">
-          <form id="transaction-form" onSubmit={handleSubmit} className="space-y-4">
+          <form
+            id="transaction-form"
+            onSubmit={handleSubmit}
+            className="space-y-4"
+          >
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-1">
                 Descrição
@@ -151,7 +159,9 @@ export default function TransactionModal({
                 type="text"
                 required
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
             </div>
@@ -166,7 +176,9 @@ export default function TransactionModal({
                   step="0.01"
                   required
                   value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, amount: e.target.value })
+                  }
                   className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
               </div>
@@ -178,7 +190,9 @@ export default function TransactionModal({
                   type="date"
                   required
                   value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, date: e.target.value })
+                  }
                   className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none [color-scheme:dark]"
                 />
               </div>
@@ -213,11 +227,13 @@ export default function TransactionModal({
                     Saída
                   </button>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, status: 'COMPLETED' })}
+                    onClick={() =>
+                      setFormData({ ...formData, status: 'COMPLETED' })
+                    }
                     className={`py-2 rounded-lg text-sm font-medium border ${
                       formData.status === 'COMPLETED'
                         ? 'bg-blue-500/20 border-blue-500/50 text-blue-400'
@@ -228,7 +244,9 @@ export default function TransactionModal({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, status: 'PENDING' })}
+                    onClick={() =>
+                      setFormData({ ...formData, status: 'PENDING' })
+                    }
                     className={`py-2 rounded-lg text-sm font-medium border ${
                       formData.status === 'PENDING'
                         ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
@@ -252,22 +270,32 @@ export default function TransactionModal({
                 ref={fileInputRef}
                 onChange={handleFileChange}
               />
-              <div 
+              <div
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full flex flex-col items-center justify-center p-4 border-2 border-dashed border-zinc-700 rounded-xl bg-zinc-950/50 hover:bg-zinc-800/50 cursor-pointer transition-colors"
               >
                 {preview ? (
-                  <img src={preview} alt="Preview" className="max-h-32 rounded-lg object-contain" />
+                  <img
+                    src={preview}
+                    alt="Preview"
+                    className="max-h-32 rounded-lg object-contain"
+                  />
                 ) : file ? (
                   <div className="flex flex-col items-center text-indigo-400">
                     <FileText className="w-8 h-8 mb-2" />
-                    <span className="text-sm font-medium truncate max-w-[200px]">{file.name}</span>
+                    <span className="text-sm font-medium truncate max-w-[200px]">
+                      {file.name}
+                    </span>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center text-zinc-500">
                     <UploadCloud className="w-8 h-8 mb-2" />
-                    <span className="text-sm font-medium">Clique para enviar arquivo</span>
-                    <span className="text-xs mt-1">PDF, JPG, PNG (máx 5MB)</span>
+                    <span className="text-sm font-medium">
+                      Clique para enviar arquivo
+                    </span>
+                    <span className="text-xs mt-1">
+                      PDF, JPG, PNG (máx 5MB)
+                    </span>
                   </div>
                 )}
               </div>
@@ -290,18 +318,22 @@ export default function TransactionModal({
           ) : (
             <div></div> // Spacer
           )}
-          
+
           <button
             type="submit"
             form="transaction-form"
             disabled={loading}
             className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
           >
-            {loading ? 'Salvando...' : transactionToEdit ? 'Atualizar' : 'Salvar'}
+            {loading
+              ? 'Salvando...'
+              : transactionToEdit
+                ? 'Atualizar'
+                : 'Salvar'}
           </button>
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

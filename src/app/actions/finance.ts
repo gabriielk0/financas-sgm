@@ -12,7 +12,7 @@ export async function getMonths() {
     return await prisma.monthBalance.findMany({
       orderBy: [{ year: 'desc' }, { month: 'desc' }],
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
     return [];
   }
@@ -45,7 +45,7 @@ export async function getCurrentMonth() {
     }
 
     return null;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
     return null;
   }
@@ -101,6 +101,64 @@ export async function closeMonth(monthId: string) {
   return { success: true };
 }
 
+export async function reopenMonth(monthId: string) {
+  try {
+    const month = await prisma.monthBalance.findUnique({
+      where: { id: monthId },
+    });
+    
+    if (!month || !month.isClosed) {
+      return { success: false, error: 'Mês não encontrado ou já está aberto.' };
+    }
+
+    // Identify the next month
+    let nextMonthNumber = month.month + 1;
+    let nextYear = month.year;
+    if (nextMonthNumber > 12) {
+      nextMonthNumber = 1;
+      nextYear++;
+    }
+
+    // Check if the next month exists and has transactions
+    const nextMonth = await prisma.monthBalance.findUnique({
+      where: { month_year: { month: nextMonthNumber, year: nextYear } },
+      include: { transactions: true }
+    });
+
+    if (nextMonth) {
+      if (nextMonth.isClosed) {
+        return { success: false, error: 'Não é possível reabrir este mês pois o mês seguinte também já foi fechado.' };
+      }
+      if (nextMonth.transactions.length > 0) {
+        return { success: false, error: 'Não é possível reabrir este mês pois o mês seguinte já possui transações. Exclua ou mova as transações do mês seguinte primeiro.' };
+      }
+      
+      // Delete the next month since it's empty
+      await prisma.$transaction([
+        prisma.monthBalance.delete({
+          where: { id: nextMonth.id }
+        }),
+        prisma.monthBalance.update({
+          where: { id: monthId },
+          data: { isClosed: false }
+        })
+      ]);
+    } else {
+      // Just reopen
+      await prisma.monthBalance.update({
+        where: { id: monthId },
+        data: { isClosed: false }
+      });
+    }
+
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: unknown) {
+    console.error('ERRO PRISMA:', error);
+    return { success: false, error: 'Erro ao reabrir mês.' };
+  }
+}
+
 // ==========================
 // TRANSACTION ACTIONS
 // ==========================
@@ -111,7 +169,7 @@ export async function getTransactions(monthId: string) {
       where: { monthId },
       orderBy: { date: 'desc' },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
     return [];
   }
@@ -159,7 +217,7 @@ export async function addTransaction(formData: FormData) {
 
     revalidatePath('/');
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
     return { success: false, error: 'Erro de conexão com o banco de dados.' };
   }
@@ -194,7 +252,7 @@ export async function updateTransaction(formData: FormData) {
       attachmentUrl = `data:${mimeType};base64,${base64Str}`;
     }
 
-    const dataToUpdate: any = {};
+    const dataToUpdate: Record<string, unknown> = {};
     if (description) dataToUpdate.description = description;
     if (type) dataToUpdate.type = type;
     if (amountStr) dataToUpdate.amount = parseFloat(amountStr);
@@ -209,7 +267,31 @@ export async function updateTransaction(formData: FormData) {
 
     revalidatePath('/');
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('ERRO PRISMA:', error);
+    return { success: false, error: 'Erro de conexão ao atualizar.' };
+  }
+}
+
+export async function completePayment(id: string) {
+  try {
+    const transaction = await prisma.transaction.findUnique({
+      where: { id },
+      include: { monthBalance: true },
+    });
+
+    if (!transaction || transaction.monthBalance.isClosed) {
+      return { success: false, error: 'Não é possível alterar transação de um mês fechado.' };
+    }
+
+    await prisma.transaction.update({
+      where: { id },
+      data: { status: 'COMPLETED' },
+    });
+
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
     return { success: false, error: 'Erro de conexão ao atualizar.' };
   }
@@ -232,7 +314,7 @@ export async function deleteTransaction(id: string) {
 
     revalidatePath('/');
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
     return { success: false, error: 'Erro de conexão ao excluir.' };
   }

@@ -1,17 +1,20 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
-import { FileText, Plus, ExternalLink, Image as ImageIcon, Edit2 } from 'lucide-react';
+import { FileText, Plus, ExternalLink, Image as ImageIcon, Edit2, CheckCircle, AlertTriangle, CalendarCheck, FolderOpen } from 'lucide-react';
 import TransactionModal from './TransactionModal';
 import AttachmentPreviewModal from './AttachmentPreviewModal';
+import { completePayment, closeMonth, reopenMonth } from '@/app/actions/finance';
+import { Transaction } from '@prisma/client';
 
 export default function TransactionTable({
   transactions,
   monthClosed,
   monthId,
 }: {
-  transactions: any[];
+  transactions: Transaction[];
   monthClosed: boolean;
   monthId: string;
 }) {
@@ -20,7 +23,24 @@ export default function TransactionTable({
     url: null,
     fileName: '',
   });
-  const [transactionToEdit, setTransactionToEdit] = useState<any>(null);
+  const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
+  const [paymentToConfirm, setPaymentToConfirm] = useState<Transaction | null>(null);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [isCloseMonthModalOpen, setIsCloseMonthModalOpen] = useState(false);
+  const [isClosingMonth, setIsClosingMonth] = useState(false);
+  const [isReopenMonthModalOpen, setIsReopenMonthModalOpen] = useState(false);
+  const [isReopeningMonth, setIsReopeningMonth] = useState(false);
+  const [reopenError, setReopenError] = useState<string | null>(null);
+
+  const searchParams = useSearchParams();
+  const typeFilter = searchParams.get('typeFilter');
+
+  const filteredTransactions = transactions.filter((t) => {
+    if (typeFilter === 'IN' || typeFilter === 'OUT') {
+      return t.type === typeFilter;
+    }
+    return true; // if no filter or invalid filter, return all
+  });
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -34,15 +54,36 @@ export default function TransactionTable({
           <p className="text-zinc-400 text-sm">Histórico de movimentações do mês selecionado</p>
         </div>
         {!monthClosed && (
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button
+              onClick={() => setIsCloseMonthModalOpen(true)}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700"
+            >
+              <CalendarCheck className="w-4 h-4 text-emerald-400" />
+              Fechar Mês
+            </button>
+            <button
+              onClick={() => {
+                setTransactionToEdit(null);
+                setIsModalOpen(true);
+              }}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-[0_0_15px_rgba(79,70,229,0.2)] hover:shadow-[0_0_20px_rgba(79,70,229,0.4)]"
+            >
+              <Plus className="w-4 h-4" />
+              Nova Transação
+            </button>
+          </div>
+        )}
+        {monthClosed && (
           <button
             onClick={() => {
-              setTransactionToEdit(null);
-              setIsModalOpen(true);
+              setReopenError(null);
+              setIsReopenMonthModalOpen(true);
             }}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-[0_0_15px_rgba(79,70,229,0.2)] hover:shadow-[0_0_20px_rgba(79,70,229,0.4)]"
+            className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700"
           >
-            <Plus className="w-4 h-4" />
-            Nova Transação
+            <FolderOpen className="w-4 h-4 text-amber-400" />
+            Reabrir Mês
           </button>
         )}
       </div>
@@ -60,14 +101,16 @@ export default function TransactionTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/50">
-            {transactions.length === 0 ? (
+            {filteredTransactions.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-8 text-center text-zinc-500 text-sm">
-                  Nenhuma transação encontrada neste mês.
+                  {transactions.length === 0 
+                    ? 'Nenhuma transação encontrada neste mês.'
+                    : 'Nenhuma transação corresponde ao filtro selecionado.'}
                 </td>
               </tr>
             ) : (
-              transactions.map((t) => (
+              filteredTransactions.map((t) => (
                 <tr key={t.id} className="hover:bg-zinc-800/30 transition-colors">
                   <td className="px-6 py-4 text-sm text-zinc-300">
                     {format(new Date(t.date), 'dd/MM/yyyy')}
@@ -106,6 +149,16 @@ export default function TransactionTable({
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-2">
+                      {!monthClosed && t.status === 'PENDING' && (
+                        <button
+                          onClick={() => setPaymentToConfirm(t)}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400 hover:text-white transition-colors"
+                          title="Concluir Pagamento"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                      )}
+
                       {t.attachmentUrl ? (
                         <button
                           onClick={() =>
@@ -165,6 +218,143 @@ export default function TransactionTable({
         attachmentUrl={previewData.url}
         fileName={previewData.fileName}
       />
+
+      {/* Confirm Payment Modal */}
+      {paymentToConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-emerald-400/10 flex items-center justify-center text-emerald-400">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Confirmar Pagamento</h3>
+                <p className="text-zinc-400 text-sm mt-1">
+                  Deseja marcar a transação <strong className="text-zinc-200">"{paymentToConfirm.description}"</strong> como concluída?
+                </p>
+              </div>
+              <div className="flex gap-3 w-full mt-4">
+                <button
+                  onClick={() => setPaymentToConfirm(null)}
+                  disabled={isCompleting}
+                  className="flex-1 px-4 py-2 rounded-xl text-sm font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    setIsCompleting(true);
+                    await completePayment(paymentToConfirm.id);
+                    setIsCompleting(false);
+                    setPaymentToConfirm(null);
+                  }}
+                  disabled={isCompleting}
+                  className="flex-1 px-4 py-2 rounded-xl text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                >
+                  {isCompleting ? 'Concluindo...' : 'Confirmar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Close Month Modal */}
+      {isCloseMonthModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                <CalendarCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Fechar o Mês?</h3>
+                <p className="text-zinc-400 text-sm mt-2">
+                  Ao fechar o mês, o saldo final será calculado apenas com as transações <strong className="text-emerald-400">concluídas</strong> e um novo mês será iniciado. Transações pendentes permanecerão pendentes no histórico.
+                </p>
+                <p className="text-zinc-300 text-sm mt-3 font-medium">
+                  Tem certeza que deseja fechar este mês agora?
+                </p>
+              </div>
+              <div className="flex gap-3 w-full mt-4">
+                <button
+                  onClick={() => setIsCloseMonthModalOpen(false)}
+                  disabled={isClosingMonth}
+                  className="flex-1 px-4 py-2 rounded-xl text-sm font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    setIsClosingMonth(true);
+                    await closeMonth(monthId);
+                    setIsClosingMonth(false);
+                    setIsCloseMonthModalOpen(false);
+                  }}
+                  disabled={isClosingMonth}
+                  className="flex-1 px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition-colors disabled:opacity-50 shadow-[0_0_15px_rgba(79,70,229,0.2)]"
+                >
+                  {isClosingMonth ? 'Fechando...' : 'Fechar Mês'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reopen Month Modal */}
+      {isReopenMonthModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400">
+                <FolderOpen className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Reabrir o Mês?</h3>
+                <p className="text-zinc-400 text-sm mt-2">
+                  Ao reabrir o mês, o mês seguinte gerado automaticamente será <strong className="text-rose-400">apagado</strong> se estiver vazio.
+                </p>
+                {reopenError && (
+                  <div className="mt-3 p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-400 text-sm text-left">
+                    <AlertTriangle className="w-4 h-4 inline mr-2" />
+                    {reopenError}
+                  </div>
+                )}
+                <p className="text-zinc-300 text-sm mt-3 font-medium">
+                  Tem certeza que deseja reabrir este mês?
+                </p>
+              </div>
+              <div className="flex gap-3 w-full mt-4">
+                <button
+                  onClick={() => setIsReopenMonthModalOpen(false)}
+                  disabled={isReopeningMonth}
+                  className="flex-1 px-4 py-2 rounded-xl text-sm font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    setIsReopeningMonth(true);
+                    setReopenError(null);
+                    const res = await reopenMonth(monthId);
+                    setIsReopeningMonth(false);
+                    if (res?.error) {
+                      setReopenError(res.error);
+                    } else {
+                      setIsReopenMonthModalOpen(false);
+                    }
+                  }}
+                  disabled={isReopeningMonth}
+                  className="flex-1 px-4 py-2 rounded-xl text-sm font-medium bg-amber-600 text-white hover:bg-amber-500 transition-colors disabled:opacity-50 shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+                >
+                  {isReopeningMonth ? 'Reabrindo...' : 'Reabrir Mês'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

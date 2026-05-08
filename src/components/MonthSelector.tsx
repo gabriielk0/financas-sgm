@@ -1,12 +1,13 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { MonthBalance } from '@prisma/client';
 
 export default function MonthSelector({
   monthsHistory,
   activeMonthId,
 }: {
-  monthsHistory: any[];
+  monthsHistory: MonthBalance[];
   activeMonthId: string;
 }) {
   const router = useRouter();
