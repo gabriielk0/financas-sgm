@@ -118,20 +118,18 @@ export default function TransactionTable({
                 <tr key={t.id} className="hover:bg-zinc-800/30 transition-colors">
                   <td className="px-6 py-4 text-sm text-zinc-300">
                     {(() => {
-                      if (!t.date) return "Sem data"; // Verifica se o campo existe
-                      
                       try {
-                        const dateObj = new Date(t.date);
+                        if (!t.date) return "---";
                         
-                        // Verifica se o JavaScript considera a data como válida
-                        if (isNaN(dateObj.getTime())) return "Data inválida";
+                        const d = new Date(t.date);
+                        if (isNaN(d.getTime())) return "Data Inválida";
                   
-                        // Ajuste de fuso horário seguro para strings simples YYYY-MM-DD
-                        const finalDate = typeof t.date === 'string' && t.date.length === 10
-                          ? new Date(`${t.date}T12:00:00`)
-                          : dateObj;
+                        // Extrai dia, mês e ano ignorando fuso horário (UTC)
+                        const dia = String(d.getUTCDate()).padStart(2, '0');
+                        const mes = String(d.getUTCMonth() + 1).padStart(2, '0');
+                        const ano = d.getUTCFullYear();
                   
-                        return format(finalDate, 'dd/MM/yyyy');
+                        return `${dia}/${mes}/${ano}`;
                       } catch (e) {
                         return "Erro na data";
                       }
