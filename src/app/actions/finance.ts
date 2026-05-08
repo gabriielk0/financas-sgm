@@ -207,6 +207,10 @@ export async function addTransaction(formData: FormData) {
     if (!month || month.isClosed) {
       return { success: false, error: 'Cannot add transaction to a closed month.' };
     }
+    
+    if (!dateStr || isNaN(new Date(dateStr).getTime())) {
+  return { success: false, error: 'Por favor, insira uma data válida.' };
+}
 
     await prisma.transaction.create({
       data: {
@@ -241,6 +245,9 @@ export async function updateTransaction(formData: FormData) {
       where: { id },
       include: { monthBalance: true },
     });
+    if (!dateStr || isNaN(new Date(dateStr).getTime())) {
+  return { success: false, error: 'Por favor, insira uma data válida.' };
+}
 
     if (!transaction || transaction.monthBalance.isClosed) {
       return { success: false, error: 'Não é possível editar transação de um mês fechado.' };
