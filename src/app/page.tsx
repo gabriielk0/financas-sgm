@@ -197,7 +197,6 @@ export default async function DashboardPage(props: {
             transactions={transactions}
             monthClosed={activeMonth.isClosed}
             monthId={activeMonth.id}
-            monthReportUrl={activeMonth.reportUrl}
           />
         ) : (
           <div className="mt-8 p-6 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800 rounded-2xl text-center">

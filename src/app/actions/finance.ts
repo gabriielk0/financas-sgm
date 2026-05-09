@@ -214,7 +214,7 @@ export async function addTransaction(formData: FormData) {
     const type = formData.get('type') as 'IN' | 'OUT';
     const amount = parseFloat(formData.get('amount') as string);
     const dateStr = formData.get('date') as string;
-    const status = 'COMPLETED';
+    const status = (formData.get('status') as 'PENDING' | 'COMPLETED') || 'COMPLETED';
 
     if (!dateStr || isNaN(new Date(dateStr).getTime())) {
       return { success: false, error: 'Por favor, insira uma data válida.' };
@@ -471,5 +471,32 @@ export async function addTransactionAttachments(formData: FormData) {
   } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
     return { success: false, error: 'Erro ao anexar arquivos na transação.' };
+  }
+}
+
+export async function deleteTransactionAttachment(attachmentId: string) {
+  try {
+    if (!attachmentId) {
+      return { success: false, error: 'Anexo não encontrado.' };
+    }
+
+    const attachment = await prisma.attachment.findUnique({
+      where: { id: attachmentId },
+      select: { id: true },
+    });
+
+    if (!attachment) {
+      return { success: false, error: 'Anexo não encontrado.' };
+    }
+
+    await prisma.attachment.delete({
+      where: { id: attachmentId },
+    });
+
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: unknown) {
+    console.error('ERRO PRISMA:', error);
+    return { success: false, error: 'Erro ao excluir anexo da transação.' };
   }
 }

@@ -4,15 +4,13 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
 import {
-  FileText,
   Plus,
-  Image as ImageIcon,
+  Eye,
   Edit2,
   CheckCircle,
   AlertTriangle,
   CalendarCheck,
   FolderOpen,
-  UploadCloud,
   Paperclip,
 } from 'lucide-react';
 import TransactionModal from './TransactionModal';
@@ -21,8 +19,8 @@ import {
   addTransactionAttachments,
   completePayment,
   closeMonth,
+  deleteTransactionAttachment,
   reopenMonth,
-  uploadMonthReport,
 } from '@/app/actions/finance';
 import type { TransactionWithAttachments } from '@/types/finance';
 
@@ -30,21 +28,16 @@ export default function TransactionTable({
   transactions,
   monthClosed,
   monthId,
-  monthReportUrl,
 }: {
   transactions: TransactionWithAttachments[];
   monthClosed: boolean;
   monthId: string;
-  monthReportUrl?: string | null;
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [previewData, setPreviewData] = useState<{
-    url: string | null;
-    fileName: string;
-  }>({
-    url: null,
-    fileName: '',
-  });
+  const [previewAttachments, setPreviewAttachments] = useState<
+    { id: string; url: string; filename: string }[]
+  >([]);
+  const [previewStartIndex, setPreviewStartIndex] = useState(0);
   const [transactionToEdit, setTransactionToEdit] =
     useState<TransactionWithAttachments | null>(null);
   const [paymentToConfirm, setPaymentToConfirm] =
@@ -56,11 +49,6 @@ export default function TransactionTable({
   const [isReopenMonthModalOpen, setIsReopenMonthModalOpen] = useState(false);
   const [isReopeningMonth, setIsReopeningMonth] = useState(false);
   const [reopenError, setReopenError] = useState<string | null>(null);
-  const [isUploadingReport, setIsUploadingReport] = useState(false);
-  const [reportUploadError, setReportUploadError] = useState<string | null>(
-    null,
-  );
-  const [isEditingReport, setIsEditingReport] = useState(false);
   const [uploadingAttachmentTxId, setUploadingAttachmentTxId] = useState<
     string | null
   >(null);
@@ -121,90 +109,6 @@ export default function TransactionTable({
           )}
           {monthClosed && (
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-              {(!monthReportUrl || isEditingReport) && (
-                <label className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700 cursor-pointer">
-                  <UploadCloud className="w-4 h-4 text-indigo-300" />
-                  {isUploadingReport
-                    ? 'Enviando...'
-                    : monthReportUrl
-                      ? 'Salvar Novo Arquivo'
-                      : 'Enviar Documento'}
-                  <input
-                    type="file"
-                    accept="application/pdf,image/*"
-                    className="hidden"
-                    disabled={isUploadingReport}
-                    onChange={async (e) => {
-                      const input = e.currentTarget;
-                      const reportFile = input.files?.[0];
-                      if (!reportFile) return;
-
-                      setIsUploadingReport(true);
-                      setReportUploadError(null);
-
-                      const payload = new FormData();
-                      payload.append('monthId', monthId);
-                      payload.append('reportFile', reportFile);
-
-                      try {
-                        const result = await uploadMonthReport(payload);
-                        if (!result.success) {
-                          setReportUploadError(
-                            result.error || 'Falha ao enviar documento.',
-                          );
-                        } else {
-                          setIsEditingReport(false);
-                          router.refresh();
-                        }
-                      } catch {
-                        setReportUploadError('Falha ao enviar documento.');
-                      } finally {
-                        setIsUploadingReport(false);
-                        input.value = '';
-                      }
-                    }}
-                  />
-                </label>
-              )}
-
-              {monthReportUrl && (
-                <a
-                  href={monthReportUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700"
-                >
-                  <FileText className="w-4 h-4 text-emerald-400" />
-                  Ver Documento
-                </a>
-              )}
-
-              {monthReportUrl && !isEditingReport && (
-                <button
-                  onClick={() => {
-                    setReportUploadError(null);
-                    setIsEditingReport(true);
-                  }}
-                  className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700"
-                >
-                  <Edit2 className="w-4 h-4 text-indigo-300" />
-                  Editar Arquivo
-                </button>
-              )}
-
-              {monthReportUrl && isEditingReport && (
-                <button
-                  onClick={() => {
-                    setReportUploadError(null);
-                    setIsEditingReport(false);
-                  }}
-                  disabled={isUploadingReport}
-                  className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700 disabled:opacity-60"
-                >
-                  Cancelar Edição
-                </button>
-              )}
-
               <button
                 onClick={() => {
                   setReopenError(null);
@@ -218,11 +122,6 @@ export default function TransactionTable({
             </div>
           )}
         </div>
-        {monthClosed && reportUploadError && (
-          <div className="px-6 py-3 border-b border-zinc-800 bg-rose-500/10 text-rose-300 text-sm">
-            {reportUploadError}
-          </div>
-        )}
         {attachmentUploadError && (
           <div className="px-6 py-3 border-b border-zinc-800 bg-rose-500/10 text-rose-300 text-sm">
             {attachmentUploadError}
@@ -307,34 +206,21 @@ export default function TransactionTable({
                         )}
 
                         {t.attachments.length > 0 ? (
-                          <div className="flex items-center gap-1">
-                            {t.attachments.slice(0, 3).map((attachment) => (
-                              <button
-                                key={attachment.id}
-                                onClick={() =>
-                                  setPreviewData({
-                                    url: attachment.url,
-                                    fileName: attachment.filename,
-                                  })
-                                }
-                                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
-                                title={attachment.filename}
-                              >
-                                {attachment.filename
-                                  .toLowerCase()
-                                  .endsWith('.pdf') ? (
-                                  <FileText className="w-4 h-4" />
-                                ) : (
-                                  <ImageIcon className="w-4 h-4" />
-                                )}
-                              </button>
-                            ))}
-                            {t.attachments.length > 3 && (
-                              <span className="text-xs text-zinc-400">
-                                +{t.attachments.length - 3}
+                          <button
+                            onClick={() => {
+                              setPreviewAttachments(t.attachments);
+                              setPreviewStartIndex(0);
+                            }}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors relative"
+                            title={`Visualizar anexos (${t.attachments.length})`}
+                          >
+                            <Eye className="w-4 h-4" />
+                            {t.attachments.length > 1 && (
+                              <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-indigo-600 text-[10px] text-white flex items-center justify-center">
+                                {t.attachments.length}
                               </span>
                             )}
-                          </div>
+                          </button>
                         ) : (
                           <span className="w-8 h-8 inline-flex items-center justify-center text-zinc-600 text-xs">
                             -
@@ -426,10 +312,21 @@ export default function TransactionTable({
       />
 
       <AttachmentPreviewModal
-        isOpen={!!previewData.url}
-        onClose={() => setPreviewData({ url: null, fileName: '' })}
-        attachmentUrl={previewData.url}
-        fileName={previewData.fileName}
+        key={previewAttachments.map((attachment) => attachment.id).join(',')}
+        isOpen={previewAttachments.length > 0}
+        onClose={() => setPreviewAttachments([])}
+        attachments={previewAttachments}
+        initialIndex={previewStartIndex}
+        onDeleteAttachment={async (attachmentId) => {
+          setAttachmentUploadError(null);
+          const result = await deleteTransactionAttachment(attachmentId);
+          if (result.success) {
+            router.refresh();
+          } else {
+            setAttachmentUploadError(result.error || 'Falha ao excluir anexo.');
+          }
+          return result;
+        }}
       />
 
       {/* Modal de confirmação de pagamento */}
