@@ -1,30 +1,54 @@
 'use client';
 
 import { useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
-import { FileText, Plus, Image as ImageIcon, Edit2, CheckCircle, AlertTriangle, CalendarCheck, FolderOpen } from 'lucide-react';
+import {
+  FileText,
+  Plus,
+  Image as ImageIcon,
+  Edit2,
+  CheckCircle,
+  AlertTriangle,
+  CalendarCheck,
+  FolderOpen,
+  UploadCloud,
+  Paperclip,
+} from 'lucide-react';
 import TransactionModal from './TransactionModal';
 import AttachmentPreviewModal from './AttachmentPreviewModal';
-import { completePayment, closeMonth, reopenMonth } from '@/app/actions/finance';
-import { Transaction } from '@prisma/client';
+import {
+  addTransactionAttachments,
+  completePayment,
+  closeMonth,
+  reopenMonth,
+  uploadMonthReport,
+} from '@/app/actions/finance';
+import type { TransactionWithAttachments } from '@/types/finance';
 
 export default function TransactionTable({
   transactions,
   monthClosed,
   monthId,
+  monthReportUrl,
 }: {
-  transactions: Transaction[];
+  transactions: TransactionWithAttachments[];
   monthClosed: boolean;
   monthId: string;
+  monthReportUrl?: string | null;
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [previewData, setPreviewData] = useState<{ url: string | null; fileName: string }>({
+  const [previewData, setPreviewData] = useState<{
+    url: string | null;
+    fileName: string;
+  }>({
     url: null,
     fileName: '',
   });
-  const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
-  const [paymentToConfirm, setPaymentToConfirm] = useState<Transaction | null>(null);
+  const [transactionToEdit, setTransactionToEdit] =
+    useState<TransactionWithAttachments | null>(null);
+  const [paymentToConfirm, setPaymentToConfirm] =
+    useState<TransactionWithAttachments | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
   const [isCloseMonthModalOpen, setIsCloseMonthModalOpen] = useState(false);
   const [isClosingMonth, setIsClosingMonth] = useState(false);
@@ -32,7 +56,19 @@ export default function TransactionTable({
   const [isReopenMonthModalOpen, setIsReopenMonthModalOpen] = useState(false);
   const [isReopeningMonth, setIsReopeningMonth] = useState(false);
   const [reopenError, setReopenError] = useState<string | null>(null);
+  const [isUploadingReport, setIsUploadingReport] = useState(false);
+  const [reportUploadError, setReportUploadError] = useState<string | null>(
+    null,
+  );
+  const [isEditingReport, setIsEditingReport] = useState(false);
+  const [uploadingAttachmentTxId, setUploadingAttachmentTxId] = useState<
+    string | null
+  >(null);
+  const [attachmentUploadError, setAttachmentUploadError] = useState<
+    string | null
+  >(null);
 
+  const router = useRouter();
   const searchParams = useSearchParams();
   const typeFilter = searchParams.get('typeFilter');
 
@@ -44,189 +80,341 @@ export default function TransactionTable({
   });
 
   const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
 
   return (
     <div>
       <div className="mt-8 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800 rounded-2xl overflow-hidden shadow-lg">
-      <div className="p-6 border-b border-zinc-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h3 className="text-lg font-semibold text-white">Transações</h3>
-          <p className="text-zinc-400 text-sm">Histórico de movimentações do mês selecionado</p>
+        <div className="p-6 border-b border-zinc-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Transações</h3>
+            <p className="text-zinc-400 text-sm">
+              Histórico de movimentações do mês selecionado
+            </p>
+          </div>
+          {!monthClosed && (
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <button
+                onClick={() => {
+                  setCloseMonthError(null);
+                  setIsCloseMonthModalOpen(true);
+                }}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700"
+              >
+                <CalendarCheck className="w-4 h-4 text-emerald-400" />
+                Fechar Mês
+              </button>
+              <button
+                onClick={() => {
+                  setTransactionToEdit(null);
+                  setIsModalOpen(true);
+                }}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-[0_0_15px_rgba(79,70,229,0.2)] hover:shadow-[0_0_20px_rgba(79,70,229,0.4)]"
+              >
+                <Plus className="w-4 h-4" />
+                Nova Transação
+              </button>
+            </div>
+          )}
+          {monthClosed && (
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              {(!monthReportUrl || isEditingReport) && (
+                <label className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700 cursor-pointer">
+                  <UploadCloud className="w-4 h-4 text-indigo-300" />
+                  {isUploadingReport
+                    ? 'Enviando...'
+                    : monthReportUrl
+                      ? 'Salvar Novo Arquivo'
+                      : 'Enviar Documento'}
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*"
+                    className="hidden"
+                    disabled={isUploadingReport}
+                    onChange={async (e) => {
+                      const input = e.currentTarget;
+                      const reportFile = input.files?.[0];
+                      if (!reportFile) return;
+
+                      setIsUploadingReport(true);
+                      setReportUploadError(null);
+
+                      const payload = new FormData();
+                      payload.append('monthId', monthId);
+                      payload.append('reportFile', reportFile);
+
+                      try {
+                        const result = await uploadMonthReport(payload);
+                        if (!result.success) {
+                          setReportUploadError(
+                            result.error || 'Falha ao enviar documento.',
+                          );
+                        } else {
+                          setIsEditingReport(false);
+                          router.refresh();
+                        }
+                      } catch {
+                        setReportUploadError('Falha ao enviar documento.');
+                      } finally {
+                        setIsUploadingReport(false);
+                        input.value = '';
+                      }
+                    }}
+                  />
+                </label>
+              )}
+
+              {monthReportUrl && (
+                <a
+                  href={monthReportUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700"
+                >
+                  <FileText className="w-4 h-4 text-emerald-400" />
+                  Ver Documento
+                </a>
+              )}
+
+              {monthReportUrl && !isEditingReport && (
+                <button
+                  onClick={() => {
+                    setReportUploadError(null);
+                    setIsEditingReport(true);
+                  }}
+                  className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700"
+                >
+                  <Edit2 className="w-4 h-4 text-indigo-300" />
+                  Editar Arquivo
+                </button>
+              )}
+
+              {monthReportUrl && isEditingReport && (
+                <button
+                  onClick={() => {
+                    setReportUploadError(null);
+                    setIsEditingReport(false);
+                  }}
+                  disabled={isUploadingReport}
+                  className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700 disabled:opacity-60"
+                >
+                  Cancelar Edição
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  setReopenError(null);
+                  setIsReopenMonthModalOpen(true);
+                }}
+                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700"
+              >
+                <FolderOpen className="w-4 h-4 text-amber-400" />
+                Reabrir Mês
+              </button>
+            </div>
+          )}
         </div>
-        {!monthClosed && (
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <button
-              onClick={() => {
-                setCloseMonthError(null);
-                setIsCloseMonthModalOpen(true);
-              }}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700"
-            >
-              <CalendarCheck className="w-4 h-4 text-emerald-400" />
-              Fechar Mês
-            </button>
-            <button
-              onClick={() => {
-                setTransactionToEdit(null);
-                setIsModalOpen(true);
-              }}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-[0_0_15px_rgba(79,70,229,0.2)] hover:shadow-[0_0_20px_rgba(79,70,229,0.4)]"
-            >
-              <Plus className="w-4 h-4" />
-              Nova Transação
-            </button>
+        {monthClosed && reportUploadError && (
+          <div className="px-6 py-3 border-b border-zinc-800 bg-rose-500/10 text-rose-300 text-sm">
+            {reportUploadError}
           </div>
         )}
-        {monthClosed && (
-          <button
-            onClick={() => {
-              setReopenError(null);
-              setIsReopenMonthModalOpen(true);
-            }}
-            className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700"
-          >
-            <FolderOpen className="w-4 h-4 text-amber-400" />
-            Reabrir Mês
-          </button>
+        {attachmentUploadError && (
+          <div className="px-6 py-3 border-b border-zinc-800 bg-rose-500/10 text-rose-300 text-sm">
+            {attachmentUploadError}
+          </div>
         )}
-      </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-zinc-900/80 text-zinc-400 text-xs uppercase tracking-wider">
-              <th className="px-6 py-4 font-medium">Data</th>
-              <th className="px-6 py-4 font-medium">Descrição</th>
-              <th className="px-6 py-4 font-medium">Categoria</th>
-              <th className="px-6 py-4 font-medium">Status</th>
-              <th className="px-6 py-4 font-medium text-right">Valor</th>
-              <th className="px-6 py-4 font-medium text-center">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-800/50">
-            {filteredTransactions.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-zinc-500 text-sm">
-                  {transactions.length === 0 
-                    ? 'Nenhuma transação encontrada neste mês.'
-                    : 'Nenhuma transação corresponde ao filtro selecionado.'}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-zinc-900/80 text-zinc-400 text-xs uppercase tracking-wider">
+                <th className="px-6 py-4 font-medium">Data</th>
+                <th className="px-6 py-4 font-medium">Descrição</th>
+                <th className="px-6 py-4 font-medium">Categoria</th>
+                <th className="px-6 py-4 font-medium">Status</th>
+                <th className="px-6 py-4 font-medium text-right">Valor</th>
+                <th className="px-6 py-4 font-medium text-center">Ações</th>
               </tr>
-            ) : (
-              filteredTransactions.map((t) => (
-                <tr key={t.id} className="hover:bg-zinc-800/30 transition-colors">
-                  <td className="px-6 py-4 text-sm text-zinc-300">
-                    {(() => {
-                      // 1. Verifica se a data existe
-                      if (!t.date) return <span className="text-rose-500">Sem data</span>;
-                  
-                      try {
-                        const d = new Date(t.date);
-                        
-                        // 2. Verifica se o objeto Date resultante é válido
-                        if (isNaN(d.getTime())) {
-                          return <span className="text-rose-500">Data Inválida</span>;
-                        }
-                  
-                        // 3. Exibe apenas a data (dia/mês/ano) usando UTC para evitar erros de fuso
-                        const dia = String(d.getUTCDate()).padStart(2, '0');
-                        const mes = String(d.getUTCMonth() + 1).padStart(2, '0');
-                        const ano = d.getUTCFullYear();
-                  
-                        return `${dia}/${mes}/${ano}`;
-                      } catch (e) {
-                        return <span className="text-rose-500">Erro</span>;
-                      }
-                    })()}
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium text-zinc-100">
-                    {t.description}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
-                        t.type === 'IN'
-                          ? 'bg-emerald-400/10 text-emerald-400 border border-emerald-400/20'
-                          : 'bg-rose-400/10 text-rose-400 border border-rose-400/20'
-                      }`}
-                    >
-                      {t.type === 'IN' ? 'Entrada' : 'Saída'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
-                        t.status === 'COMPLETED'
-                          ? 'bg-blue-400/10 text-blue-400 border border-blue-400/20'
-                          : 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
-                      }`}
-                    >
-                      {t.status === 'COMPLETED' ? 'Concluído' : 'Pendente'}
-                    </span>
-                  </td>
+            </thead>
+            <tbody className="divide-y divide-zinc-800/50">
+              {filteredTransactions.length === 0 ? (
+                <tr>
                   <td
-                    className={`px-6 py-4 text-sm text-right font-medium ${
-                      t.type === 'IN' ? 'text-emerald-400' : 'text-rose-400'
-                    }`}
+                    colSpan={6}
+                    className="px-6 py-8 text-center text-zinc-500 text-sm"
                   >
-                    {t.type === 'IN' ? '+' : '-'} {formatCurrency(t.amount)}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      {!monthClosed && t.status === 'PENDING' && (
-                        <button
-                          onClick={() => setPaymentToConfirm(t)}
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400 hover:text-white transition-colors"
-                          title="Concluir Pagamento"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      {t.attachmentUrl ? (
-                        <button
-                          onClick={() =>
-                            setPreviewData({
-                              url: t.attachmentUrl,
-                              fileName: `Comprovante_${t.description.replace(/\s+/g, '_')}`,
-                            })
-                          }
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
-                          title="Ver Anexo"
-                        >
-                          {t.attachmentUrl.includes('application/pdf') ? (
-                            <FileText className="w-4 h-4" />
-                          ) : (
-                            <ImageIcon className="w-4 h-4" />
-                          )}
-                        </button>
-                      ) : (
-                        <span className="w-8 h-8 inline-flex items-center justify-center text-zinc-600 text-xs">-</span>
-                      )}
-
-                      {!monthClosed && (
-                        <button
-                          onClick={() => {
-                            setTransactionToEdit(t);
-                            setIsModalOpen(true);
-                          }}
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-800 text-zinc-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors"
-                          title="Editar Transação"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
+                    {transactions.length === 0
+                      ? 'Nenhuma transação encontrada neste mês.'
+                      : 'Nenhuma transação corresponde ao filtro selecionado.'}
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                filteredTransactions.map((t) => (
+                  <tr
+                    key={t.id}
+                    className="hover:bg-zinc-800/30 transition-colors"
+                  >
+                    <td className="px-6 py-4 text-sm text-zinc-300">
+                      {format(new Date(t.date), 'dd/MM/yyyy')}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-zinc-100">
+                      {t.description}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
+                          t.type === 'IN'
+                            ? 'bg-emerald-400/10 text-emerald-400 border border-emerald-400/20'
+                            : 'bg-rose-400/10 text-rose-400 border border-rose-400/20'
+                        }`}
+                      >
+                        {t.type === 'IN' ? 'Entrada' : 'Saída'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
+                          t.status === 'COMPLETED'
+                            ? 'bg-blue-400/10 text-blue-400 border border-blue-400/20'
+                            : 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
+                        }`}
+                      >
+                        {t.status === 'COMPLETED' ? 'Concluído' : 'Pendente'}
+                      </span>
+                    </td>
+                    <td
+                      className={`px-6 py-4 text-sm text-right font-medium ${
+                        t.type === 'IN' ? 'text-emerald-400' : 'text-rose-400'
+                      }`}
+                    >
+                      {t.type === 'IN' ? '+' : '-'} {formatCurrency(t.amount)}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        {!monthClosed && t.status === 'PENDING' && (
+                          <button
+                            onClick={() => setPaymentToConfirm(t)}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400 hover:text-white transition-colors"
+                            title="Concluir Pagamento"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {t.attachments.length > 0 ? (
+                          <div className="flex items-center gap-1">
+                            {t.attachments.slice(0, 3).map((attachment) => (
+                              <button
+                                key={attachment.id}
+                                onClick={() =>
+                                  setPreviewData({
+                                    url: attachment.url,
+                                    fileName: attachment.filename,
+                                  })
+                                }
+                                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+                                title={attachment.filename}
+                              >
+                                {attachment.filename
+                                  .toLowerCase()
+                                  .endsWith('.pdf') ? (
+                                  <FileText className="w-4 h-4" />
+                                ) : (
+                                  <ImageIcon className="w-4 h-4" />
+                                )}
+                              </button>
+                            ))}
+                            {t.attachments.length > 3 && (
+                              <span className="text-xs text-zinc-400">
+                                +{t.attachments.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="w-8 h-8 inline-flex items-center justify-center text-zinc-600 text-xs">
+                            -
+                          </span>
+                        )}
+
+                        <label
+                          className={`inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-800 text-zinc-400 hover:text-indigo-300 hover:bg-zinc-700 transition-colors cursor-pointer ${
+                            uploadingAttachmentTxId === t.id
+                              ? 'opacity-60 pointer-events-none'
+                              : ''
+                          }`}
+                          title="Anexar arquivos"
+                        >
+                          <Paperclip className="w-4 h-4" />
+                          <input
+                            type="file"
+                            multiple
+                            accept="application/pdf,image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const input = e.currentTarget;
+                              const selected = input.files
+                                ? Array.from(input.files)
+                                : [];
+                              if (selected.length === 0) return;
+
+                              setUploadingAttachmentTxId(t.id);
+                              setAttachmentUploadError(null);
+
+                              const payload = new FormData();
+                              payload.append('transactionId', t.id);
+                              selected.forEach((file) =>
+                                payload.append('files', file),
+                              );
+
+                              try {
+                                const result =
+                                  await addTransactionAttachments(payload);
+                                if (!result.success) {
+                                  setAttachmentUploadError(
+                                    result.error || 'Falha ao anexar arquivos.',
+                                  );
+                                } else {
+                                  router.refresh();
+                                }
+                              } catch {
+                                setAttachmentUploadError(
+                                  'Falha ao anexar arquivos.',
+                                );
+                              } finally {
+                                setUploadingAttachmentTxId(null);
+                                input.value = '';
+                              }
+                            }}
+                          />
+                        </label>
+
+                        {!monthClosed && (
+                          <button
+                            onClick={() => {
+                              setTransactionToEdit(t);
+                              setIsModalOpen(true);
+                            }}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-800 text-zinc-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+                            title="Editar Transação"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
-      </div>
-      
+
       <TransactionModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -253,9 +441,15 @@ export default function TransactionTable({
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">Confirmar Pagamento</h3>
+                <h3 className="text-lg font-semibold text-white">
+                  Confirmar Pagamento
+                </h3>
                 <p className="text-zinc-400 text-sm mt-1">
-                  Deseja marcar a transação <strong className="text-zinc-200">&quot;{paymentToConfirm.description}&quot;</strong> como concluída?
+                  Deseja marcar a transação{' '}
+                  <strong className="text-zinc-200">
+                    &quot;{paymentToConfirm.description}&quot;
+                  </strong>{' '}
+                  como concluída?
                 </p>
               </div>
               <div className="flex gap-3 w-full mt-4">
@@ -293,9 +487,15 @@ export default function TransactionTable({
                 <CalendarCheck className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">Fechar o Mês?</h3>
+                <h3 className="text-lg font-semibold text-white">
+                  Fechar o Mês?
+                </h3>
                 <p className="text-zinc-400 text-sm mt-2">
-                  Ao fechar o mês, o saldo final será calculado apenas com as transações <strong className="text-emerald-400">concluídas</strong> e um novo mês será iniciado. Transações pendentes permanecerão pendentes no histórico.
+                  Ao fechar o mês, o saldo final será calculado apenas com as
+                  transações{' '}
+                  <strong className="text-emerald-400">concluídas</strong> e um
+                  novo mês será iniciado. Transações pendentes permanecerão
+                  pendentes no histórico.
                 </p>
                 {closeMonthError && (
                   <div className="mt-3 p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-400 text-sm text-left">
@@ -325,9 +525,12 @@ export default function TransactionTable({
                         setCloseMonthError(res.error);
                       } else {
                         setIsCloseMonthModalOpen(false);
+                        router.refresh();
                       }
                     } catch {
-                      setCloseMonthError('Ocorreu um erro inesperado ao fechar o mês.');
+                      setCloseMonthError(
+                        'Ocorreu um erro inesperado ao fechar o mês.',
+                      );
                     } finally {
                       setIsClosingMonth(false);
                     }
@@ -352,9 +555,13 @@ export default function TransactionTable({
                 <FolderOpen className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">Reabrir o Mês?</h3>
+                <h3 className="text-lg font-semibold text-white">
+                  Reabrir o Mês?
+                </h3>
                 <p className="text-zinc-400 text-sm mt-2">
-                  Ao reabrir o mês, o mês seguinte gerado automaticamente será <strong className="text-rose-400">apagado</strong> se estiver vazio.
+                  Ao reabrir o mês, o mês seguinte gerado automaticamente será{' '}
+                  <strong className="text-rose-400">apagado</strong> se estiver
+                  vazio.
                 </p>
                 {reopenError && (
                   <div className="mt-3 p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-400 text-sm text-left">

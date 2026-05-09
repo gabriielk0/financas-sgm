@@ -6,13 +6,12 @@ import MonthSelector from '@/components/MonthSelector';
 import { LogOut, Printer } from 'lucide-react';
 import { logoutAction } from './actions/auth';
 import { redirect } from 'next/navigation';
-import { MonthBalance, Transaction } from '@prisma/client';
+import { MonthBalance } from '@prisma/client';
+import type { TransactionWithAttachments } from '@/types/finance';
 
-export default async function DashboardPage(
-  props: {
-    searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
-  }
-) {
+export default async function DashboardPage(props: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const searchParams = await props.searchParams;
   const currentMonth = await getCurrentMonth();
   const monthsHistory = await getMonths();
@@ -26,7 +25,8 @@ export default async function DashboardPage(
         <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-xl max-w-md">
           <h2 className="text-xl font-bold text-white mb-2">Erro de Conexão</h2>
           <p className="text-zinc-400">
-            Não foi possível carregar os dados financeiros ou o banco de dados está inacessível.
+            Não foi possível carregar os dados financeiros ou o banco de dados
+            está inacessível.
           </p>
         </div>
       </div>
@@ -36,34 +36,41 @@ export default async function DashboardPage(
   // Usar o último mês aberto ou o mais recente
   const paramMonthId = searchParams?.monthId as string | undefined;
   const activeMonth = paramMonthId
-    ? monthsHistory.find((m) => m.id === paramMonthId) || currentMonth || monthsHistory[0]
+    ? monthsHistory.find((m) => m.id === paramMonthId) ||
+      currentMonth ||
+      monthsHistory[0]
     : currentMonth || monthsHistory[0];
 
   if (!activeMonth) {
     return (
       <div className="min-h-screen flex items-center justify-center p-8 bg-zinc-950 text-center">
         <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-xl max-w-md">
-          <h2 className="text-xl font-bold text-white mb-2">Dados indisponíveis</h2>
+          <h2 className="text-xl font-bold text-white mb-2">
+            Dados indisponíveis
+          </h2>
           <p className="text-zinc-400">
-            Não foi possível determinar o mês ativo no momento. Tente novamente em instantes.
+            Não foi possível determinar o mês ativo no momento. Tente novamente
+            em instantes.
           </p>
         </div>
       </div>
     );
   }
 
-  let transactions: Transaction[] = [];
+  let transactions: TransactionWithAttachments[] = [];
   const displayMonthBalance: MonthBalance = { ...activeMonth };
 
   if (view === 'monthly') {
     transactions = await getTransactions(activeMonth.id);
   } else if (view === 'semiannual') {
-    const currentIndex = monthsHistory.findIndex((m) => m.id === activeMonth.id);
+    const currentIndex = monthsHistory.findIndex(
+      (m) => m.id === activeMonth.id,
+    );
     const targetMonths = monthsHistory.slice(currentIndex, currentIndex + 6);
     const monthIds = targetMonths.map((m) => m.id);
-    
+
     // Buscar todas as transações desses 6 meses
-    const allTxs = await Promise.all(monthIds.map(id => getTransactions(id)));
+    const allTxs = await Promise.all(monthIds.map((id) => getTransactions(id)));
     transactions = allTxs.flat();
 
     // O mês mais antigo do recorte é a base para o saldo inicial
@@ -74,7 +81,7 @@ export default async function DashboardPage(
     const yearMonths = monthsHistory.filter((m) => m.year === currentYear);
     const monthIds = yearMonths.map((m) => m.id);
 
-    const allTxs = await Promise.all(monthIds.map(id => getTransactions(id)));
+    const allTxs = await Promise.all(monthIds.map((id) => getTransactions(id)));
     transactions = allTxs.flat();
 
     // Encontrar janeiro ou o mês mais antigo do ano para a base
@@ -94,9 +101,11 @@ export default async function DashboardPage(
             <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
               <span className="text-white font-bold">S</span>
             </div>
-            <h1 className="text-xl font-semibold text-white tracking-tight">Segue-me</h1>
+            <h1 className="text-xl font-semibold text-white tracking-tight">
+              Segue-me
+            </h1>
           </div>
-          
+
           <div className="flex items-center gap-4">
             <form
               action={async () => {
@@ -121,23 +130,44 @@ export default async function DashboardPage(
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 relative z-10">
         <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div>
-            <h2 className="text-2xl font-bold text-white">Dashboard Financeiro</h2>
+            <h2 className="text-2xl font-bold text-white">
+              Dashboard Financeiro
+            </h2>
             <p className="text-zinc-400 mt-1">
-              Visão geral de {activeMonth.month.toString().padStart(2, '0')}/{activeMonth.year}
+              Visão geral de {activeMonth.month.toString().padStart(2, '0')}/
+              {activeMonth.year}
             </p>
           </div>
-          
+
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto bg-zinc-900/80 p-2 rounded-xl border border-zinc-800">
             <div className="flex items-center gap-2 bg-zinc-950 p-1 rounded-lg w-full sm:w-auto">
-              <a href={`/?view=monthly&monthId=${activeMonth.id}`} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'monthly' ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'}`}>Mensal</a>
-              <a href={`/?view=semiannual&monthId=${activeMonth.id}`} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'semiannual' ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'}`}>Semestral</a>
-              <a href={`/?view=annual&monthId=${activeMonth.id}`} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'annual' ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'}`}>Anual</a>
+              <a
+                href={`/?view=monthly&monthId=${activeMonth.id}`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'monthly' ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'}`}
+              >
+                Mensal
+              </a>
+              <a
+                href={`/?view=semiannual&monthId=${activeMonth.id}`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'semiannual' ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'}`}
+              >
+                Semestral
+              </a>
+              <a
+                href={`/?view=annual&monthId=${activeMonth.id}`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'annual' ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'}`}
+              >
+                Anual
+              </a>
             </div>
-            
+
             <div className="w-full sm:w-auto border-t sm:border-t-0 sm:border-l border-zinc-700 pt-2 sm:pt-0 sm:pl-4 flex gap-2 items-center">
-              <MonthSelector monthsHistory={monthsHistory} activeMonthId={activeMonth.id} />
-              
-              <a 
+              <MonthSelector
+                monthsHistory={monthsHistory}
+                activeMonthId={activeMonth.id}
+              />
+
+              <a
                 href={`/report?view=${view}&monthId=${activeMonth.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -151,15 +181,29 @@ export default async function DashboardPage(
           </div>
         </div>
 
-        <DashboardStats monthBalance={displayMonthBalance} transactions={transactions} />
-        
-        <Charts monthsHistory={monthsHistory} transactions={transactions} view={view} />
+        <DashboardStats
+          monthBalance={displayMonthBalance}
+          transactions={transactions}
+        />
+
+        <Charts
+          monthsHistory={monthsHistory}
+          transactions={transactions}
+          view={view}
+        />
 
         {view === 'monthly' ? (
-          <TransactionTable transactions={transactions} monthClosed={activeMonth.isClosed} monthId={activeMonth.id} />
+          <TransactionTable
+            transactions={transactions}
+            monthClosed={activeMonth.isClosed}
+            monthId={activeMonth.id}
+            monthReportUrl={activeMonth.reportUrl}
+          />
         ) : (
           <div className="mt-8 p-6 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800 rounded-2xl text-center">
-            <p className="text-zinc-400">Exibição detalhada de transações ocultada nas visões consolidadas.</p>
+            <p className="text-zinc-400">
+              Exibição detalhada de transações ocultada nas visões consolidadas.
+            </p>
           </div>
         )}
       </main>

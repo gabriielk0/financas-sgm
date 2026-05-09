@@ -17,6 +17,7 @@ model MonthBalance {
   initialBalance Float
   finalBalance   Float         @default(0)
   isClosed       Boolean       @default(false)
+  reportUrl      String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   transactions   Transaction[]
@@ -25,15 +26,25 @@ model MonthBalance {
 }
 
 model Transaction {
-  id            String       @id @default(uuid())
-  date          DateTime
-  description   String
-  type          String       // "IN" ou "OUT"
-  amount        Float
-  status        String       @default("COMPLETED") // "PENDING" ou "COMPLETED"
-  attachmentUrl String?      // Pode armazenar string Base64 ou URL externa
-  monthId       String
-  monthBalance  MonthBalance @relation(fields: [monthId], references: [id])
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id           String       @id @default(uuid())
+  date         DateTime
+  description  String
+  type         String       // "IN" ou "OUT"
+  amount       Float
+  status       String       @default("COMPLETED") // "PENDING" ou "COMPLETED"
+  monthId      String
+  monthBalance MonthBalance @relation(fields: [monthId], references: [id])
+  attachments  Attachment[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Attachment {
+  id            String      @id @default(uuid())
+  url           String
+  filename      String
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }

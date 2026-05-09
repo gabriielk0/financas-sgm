@@ -16,7 +16,8 @@ export default function AttachmentPreviewModal({
 }) {
   if (!isOpen || !attachmentUrl || typeof document === 'undefined') return null;
 
-  const isPdf = attachmentUrl.includes('application/pdf');
+  const lowerName = fileName.toLowerCase();
+  const isPdf = lowerName.endsWith('.pdf') || attachmentUrl.toLowerCase().includes('.pdf');
 
   return createPortal(
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
@@ -30,7 +31,7 @@ export default function AttachmentPreviewModal({
           <div className="flex items-center gap-2">
             <a
               href={attachmentUrl}
-              download={`${fileName}.${isPdf ? 'pdf' : 'png'}`}
+              download={fileName}
               className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors"
             >
               <Download className="w-4 h-4" />

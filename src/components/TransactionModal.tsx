@@ -8,7 +8,7 @@ import {
   updateTransaction,
   deleteTransaction,
 } from '@/app/actions/finance';
-import { Transaction } from '@prisma/client';
+import type { TransactionWithAttachments } from '@/types/finance';
 
 export default function TransactionModal({
   isOpen,
@@ -19,9 +19,10 @@ export default function TransactionModal({
   isOpen: boolean;
   onClose: () => void;
   monthId: string;
-  transactionToEdit?: Transaction | null;
+  transactionToEdit?: TransactionWithAttachments | null;
 }) {
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
@@ -29,7 +30,7 @@ export default function TransactionModal({
     date: new Date().toISOString().split('T')[0],
     status: 'COMPLETED' as 'COMPLETED' | 'PENDING',
   });
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -47,9 +48,9 @@ export default function TransactionModal({
         date: new Date(transactionToEdit.date).toISOString().split('T')[0],
         status,
       });
-      if (transactionToEdit.attachmentUrl) {
-        setPreview(transactionToEdit.attachmentUrl);
-      }
+      setFiles([]);
+      setPreview(null);
+      setSubmitError(null);
     } else if (isOpen) {
       // Resetar ao abrir para uma nova transação
       setFormData({
@@ -59,29 +60,30 @@ export default function TransactionModal({
         date: new Date().toISOString().split('T')[0],
         status: 'COMPLETED',
       });
-      setFile(null);
+      setFiles([]);
       setPreview(null);
+      setSubmitError(null);
     }
   }, [transactionToEdit, isOpen]);
 
   if (!isOpen || typeof document === 'undefined') return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      setFile(selectedFile);
+    if (e.target.files && e.target.files.length > 0) {
+      const selectedFiles = Array.from(e.target.files);
+      setFiles(selectedFiles);
 
-      if (selectedFile.type.startsWith('image/')) {
-        setPreview(URL.createObjectURL(selectedFile));
-      } else {
-        setPreview(null);
-      }
+      const firstImage = selectedFiles.find((selectedFile) =>
+        selectedFile.type.startsWith('image/'),
+      );
+      setPreview(firstImage ? URL.createObjectURL(firstImage) : null);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setSubmitError(null);
 
     try {
       const submitData = new FormData();
@@ -91,23 +93,31 @@ export default function TransactionModal({
       submitData.append('date', formData.date);
       submitData.append('status', formData.status);
 
-      if (file) {
-        submitData.append('file', file);
-      }
+      files.forEach((selectedFile) => {
+        submitData.append('files', selectedFile);
+      });
 
       if (transactionToEdit) {
         submitData.append('id', transactionToEdit.id);
-        await updateTransaction(submitData);
+        const result = await updateTransaction(submitData);
+        if (!result.success) {
+          setSubmitError(result.error || 'Erro ao salvar transação.');
+          return;
+        }
       } else {
         submitData.append('monthId', monthId);
-        await addTransaction(submitData);
+        const result = await addTransaction(submitData);
+        if (!result.success) {
+          setSubmitError(result.error || 'Erro ao salvar transação.');
+          return;
+        }
       }
 
-      setFile(null);
+      setFiles([]);
       setPreview(null);
       onClose();
     } catch {
-      alert('Erro ao salvar transação.');
+      setSubmitError('Erro ao salvar transação.');
     } finally {
       setLoading(false);
     }
@@ -152,6 +162,11 @@ export default function TransactionModal({
             className="space-y-4"
           >
             <div>
+              {submitError && (
+                <div className="mb-3 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+                  {submitError}
+                </div>
+              )}
               <label className="block text-sm font-medium text-zinc-300 mb-1">
                 Descrição
               </label>
@@ -263,9 +278,26 @@ export default function TransactionModal({
               <label className="block text-sm font-medium text-zinc-300 mb-1">
                 Anexo (Recibo/Comprovante)
               </label>
+              {transactionToEdit && transactionToEdit.attachments.length > 0 && files.length === 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {transactionToEdit.attachments.map((attachment) => (
+                    <a
+                      key={attachment.id}
+                      href={attachment.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      {attachment.filename}
+                    </a>
+                  ))}
+                </div>
+              )}
               <input
                 type="file"
                 accept="image/*,application/pdf"
+                multiple
                 className="hidden"
                 ref={fileInputRef}
                 onChange={handleFileChange}
@@ -280,11 +312,11 @@ export default function TransactionModal({
                     alt="Preview"
                     className="max-h-32 rounded-lg object-contain"
                   />
-                ) : file ? (
+                ) : files.length > 0 ? (
                   <div className="flex flex-col items-center text-indigo-400">
                     <FileText className="w-8 h-8 mb-2" />
                     <span className="text-sm font-medium truncate max-w-[200px]">
-                      {file.name}
+                      {files.length === 1 ? files[0].name : `${files.length} arquivos selecionados`}
                     </span>
                   </div>
                 ) : (

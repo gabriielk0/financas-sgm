@@ -63,7 +63,6 @@ async function main() {
         type: isTypeIn ? 'IN' : 'OUT',
         amount,
         status: Math.random() > 0.1 ? 'COMPLETED' : 'PENDING',
-        attachmentUrl: Math.random() > 0.7 ? 'https://via.placeholder.com/150' : null,
       });
     }
 

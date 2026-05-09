@@ -2,6 +2,19 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
+import { put } from '@vercel/blob';
+
+async function uploadFileToStorage(path: string, file: File) {
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    const blob = await put(path, file, { access: 'public', addRandomSuffix: true });
+    return blob.url;
+  }
+
+  // Fallback local/dev quando token do Blob não estiver configurado.
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const mimeType = file.type || 'application/octet-stream';
+  return `data:${mimeType};base64,${buffer.toString('base64')}`;
+}
 
 // ==========================
 // ACOES DE MES
@@ -172,6 +185,7 @@ export async function getTransactions(monthId: string) {
   try {
     return await prisma.transaction.findMany({
       where: { monthId },
+      include: { attachments: true },
       orderBy: { date: 'desc' },
     });
   } catch (error: unknown) {
@@ -183,46 +197,65 @@ export async function getTransactions(monthId: string) {
 export async function addTransaction(formData: FormData) {
   try {
     const monthId = formData.get('monthId') as string;
+
+    // Regra de segurança: bloquear imediatamente operações em mês fechado
+    const month = await prisma.monthBalance.findUnique({
+      where: { id: monthId },
+      select: { id: true, isClosed: true },
+    });
+    if (!month) {
+      return { success: false, error: 'Mês não encontrado.' };
+    }
+    if (month.isClosed) {
+      return { success: false, error: 'Não é possível adicionar transação em mês fechado.' };
+    }
+
     const description = formData.get('description') as string;
     const type = formData.get('type') as 'IN' | 'OUT';
     const amount = parseFloat(formData.get('amount') as string);
     const dateStr = formData.get('date') as string;
     const status = 'COMPLETED';
 
-    const file = formData.get('file') as File | null;
-    let attachmentUrl = undefined;
-
-    if (file && file.size > 0) {
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const base64Str = buffer.toString('base64');
-      const mimeType = file.type;
-      attachmentUrl = `data:${mimeType};base64,${base64Str}`;
-    }
-
-    const month = await prisma.monthBalance.findUnique({
-      where: { id: monthId },
-    });
-
-    if (!month || month.isClosed) {
-      return { success: false, error: 'Cannot add transaction to a closed month.' };
-    }
-    
     if (!dateStr || isNaN(new Date(dateStr).getTime())) {
-  return { success: false, error: 'Por favor, insira uma data válida.' };
-}
+      return { success: false, error: 'Por favor, insira uma data válida.' };
+    }
 
-    await prisma.transaction.create({
+    const createdTransaction = await prisma.transaction.create({
       data: {
         date: new Date(dateStr),
         description,
         type,
         amount,
         status,
-        attachmentUrl,
         monthId,
       },
     });
+
+    const rawFiles = [
+      ...(formData.getAll('files') as File[]),
+      formData.get('file') as File | null,
+    ];
+    const files = rawFiles.filter((file): file is File => !!file && file.size > 0);
+
+    if (files.length > 0) {
+      const uploadedAttachments = await Promise.all(
+        files.map(async (file) => {
+          const url = await uploadFileToStorage(
+            `transactions/${createdTransaction.id}/${Date.now()}-${file.name}`,
+            file,
+          );
+          return {
+            url,
+            filename: file.name,
+            transactionId: createdTransaction.id,
+          };
+        }),
+      );
+
+      await prisma.attachment.createMany({
+        data: uploadedAttachments,
+      });
+    }
 
     revalidatePath('/');
     return { success: true };
@@ -235,33 +268,27 @@ export async function addTransaction(formData: FormData) {
 export async function updateTransaction(formData: FormData) {
   try {
     const id = formData.get('id') as string;
+
+    // Regra de segurança: bloquear imediatamente operações em mês fechado
+    const transaction = await prisma.transaction.findUnique({
+      where: { id },
+      include: { monthBalance: true },
+    });
+    if (!transaction) {
+      return { success: false, error: 'Transação não encontrada.' };
+    }
+    if (transaction.monthBalance.isClosed) {
+      return { success: false, error: 'Não é possível editar transação de um mês fechado.' };
+    }
+
     const description = formData.get('description') as string;
     const type = formData.get('type') as 'IN' | 'OUT';
     const amountStr = formData.get('amount') as string;
     const dateStr = formData.get('date') as string;
     const status = formData.get('status') as 'PENDING' | 'COMPLETED';
 
-    const transaction = await prisma.transaction.findUnique({
-      where: { id },
-      include: { monthBalance: true },
-    });
     if (!dateStr || isNaN(new Date(dateStr).getTime())) {
-  return { success: false, error: 'Por favor, insira uma data válida.' };
-}
-
-    if (!transaction || transaction.monthBalance.isClosed) {
-      return { success: false, error: 'Não é possível editar transação de um mês fechado.' };
-    }
-
-    const file = formData.get('file') as File | null;
-    let attachmentUrl = transaction.attachmentUrl; // Manter o atual se não houver novo arquivo
-
-    if (file && file.size > 0) {
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const base64Str = buffer.toString('base64');
-      const mimeType = file.type;
-      attachmentUrl = `data:${mimeType};base64,${base64Str}`;
+      return { success: false, error: 'Por favor, insira uma data válida.' };
     }
 
     const dataToUpdate: Record<string, unknown> = {};
@@ -270,12 +297,37 @@ export async function updateTransaction(formData: FormData) {
     if (amountStr) dataToUpdate.amount = parseFloat(amountStr);
     if (dateStr) dataToUpdate.date = new Date(dateStr);
     if (status) dataToUpdate.status = status;
-    dataToUpdate.attachmentUrl = attachmentUrl;
 
     await prisma.transaction.update({
       where: { id },
       data: dataToUpdate,
     });
+
+    const rawFiles = [
+      ...(formData.getAll('files') as File[]),
+      formData.get('file') as File | null,
+    ];
+    const files = rawFiles.filter((file): file is File => !!file && file.size > 0);
+
+    if (files.length > 0) {
+      const uploadedAttachments = await Promise.all(
+        files.map(async (file) => {
+          const url = await uploadFileToStorage(
+            `transactions/${id}/${Date.now()}-${file.name}`,
+            file,
+          );
+          return {
+            url,
+            filename: file.name,
+            transactionId: id,
+          };
+        }),
+      );
+
+      await prisma.attachment.createMany({
+        data: uploadedAttachments,
+      });
+    }
 
     revalidatePath('/');
     return { success: true };
@@ -311,12 +363,15 @@ export async function completePayment(id: string) {
 
 export async function deleteTransaction(id: string) {
   try {
+    // Regra de segurança: bloquear imediatamente operações em mês fechado
     const transaction = await prisma.transaction.findUnique({
       where: { id },
       include: { monthBalance: true },
     });
-
-    if (!transaction || transaction.monthBalance.isClosed) {
+    if (!transaction) {
+      return { success: false, error: 'Transação não encontrada.' };
+    }
+    if (transaction.monthBalance.isClosed) {
       return { success: false, error: 'Não é possível excluir transação de um mês fechado.' };
     }
 
@@ -329,5 +384,92 @@ export async function deleteTransaction(id: string) {
   } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
     return { success: false, error: 'Erro de conexão ao excluir.' };
+  }
+}
+
+export async function uploadMonthReport(formData: FormData) {
+  try {
+    const monthId = formData.get('monthId') as string;
+    const file = formData.get('reportFile') as File | null;
+
+    if (!monthId || !file || file.size === 0) {
+      return { success: false, error: 'Informe um arquivo válido para o relatório.' };
+    }
+
+    const month = await prisma.monthBalance.findUnique({
+      where: { id: monthId },
+    });
+
+    if (!month) {
+      return { success: false, error: 'Mês não encontrado.' };
+    }
+
+    const url = await uploadFileToStorage(
+      `months/${monthId}/report-${Date.now()}-${file.name}`,
+      file,
+    );
+
+    await prisma.monthBalance.update({
+      where: { id: monthId },
+      data: { reportUrl: url },
+    });
+
+    revalidatePath('/');
+    return { success: true, url };
+  } catch (error: unknown) {
+    console.error('ERRO PRISMA:', error);
+    return { success: false, error: 'Erro ao enviar documento de fechamento.' };
+  }
+}
+
+export async function addTransactionAttachments(formData: FormData) {
+  try {
+    const transactionId = formData.get('transactionId') as string;
+
+    if (!transactionId) {
+      return { success: false, error: 'Transação não encontrada.' };
+    }
+
+    const transaction = await prisma.transaction.findUnique({
+      where: { id: transactionId },
+      include: { monthBalance: true },
+    });
+
+    if (!transaction) {
+      return { success: false, error: 'Transação não encontrada.' };
+    }
+
+    const files = (formData.getAll('files') as File[]).filter(
+      (file): file is File => !!file && file.size > 0,
+    );
+
+    if (files.length === 0) {
+      return { success: false, error: 'Nenhum arquivo válido foi enviado.' };
+    }
+
+    const uploadedAttachments = await Promise.all(
+      files.map(async (file) => {
+        const url = await uploadFileToStorage(
+          `transactions/${transactionId}/${Date.now()}-${file.name}`,
+          file,
+        );
+
+        return {
+          url,
+          filename: file.name,
+          transactionId,
+        };
+      }),
+    );
+
+    await prisma.attachment.createMany({
+      data: uploadedAttachments,
+    });
+
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: unknown) {
+    console.error('ERRO PRISMA:', error);
+    return { success: false, error: 'Erro ao anexar arquivos na transação.' };
   }
 }
