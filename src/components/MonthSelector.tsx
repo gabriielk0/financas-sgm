@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { MonthBalance } from '@prisma/client';
 
 export default function MonthSelector({
@@ -11,12 +11,16 @@ export default function MonthSelector({
   activeMonthId: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   return (
     <select
       value={activeMonthId}
       onChange={(e) => {
-        router.push(`/?monthId=${e.target.value}`);
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('monthId', e.target.value);
+        router.push(`${pathname}?${params.toString()}`);
       }}
       className="bg-zinc-900 border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
     >

@@ -26,17 +26,20 @@ model MonthBalance {
 }
 
 model Transaction {
-  id           String       @id @default(uuid())
-  date         DateTime
-  description  String
-  type         String       // "IN" ou "OUT"
-  amount       Float
-  status       String       @default("COMPLETED") // "PENDING" ou "COMPLETED"
-  monthId      String
-  monthBalance MonthBalance @relation(fields: [monthId], references: [id])
-  attachments  Attachment[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id            String       @id @default(uuid())
+  date          DateTime
+  description   String
+  type          String       // "IN" ou "OUT"
+  amount        Float
+  status        String       @default("COMPLETED") // "PENDING" ou "COMPLETED"
+  monthId       String
+  referenceType String?
+  referenceId   String?
+  monthBalance  MonthBalance @relation(fields: [monthId], references: [id])
+  attachments   Attachment[]
+  reembolso     Reembolso?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 }
 
 model Attachment {
@@ -47,4 +50,40 @@ model Attachment {
   transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+}
+
+model Usuario {
+  id         String      @id @default(uuid())
+  nome       String
+  equipe     String
+  email      String      @unique
+  whatsapp   String
+  senha      String
+  status     String      @default("aguardando_aprovacao")
+  perfil     String      @default("equipe")
+  criado_em  DateTime    @default(now())
+  reembolsos Reembolso[]
+
+  @@map("usuarios")
+}
+
+model Reembolso {
+  id              String       @id @default(uuid())
+  usuario_id      String
+  nome_pagador    String
+  equipe          String
+  descricao       String
+  finalidade      String
+  valor           Float
+  chave_pix       String
+  anexo_url       String
+  status          String       @default("pendente_reembolso")
+  motivo_rejeicao String?
+  lancamento_id   String?      @unique
+  criado_em       DateTime     @default(now())
+  atualizado_em   DateTime     @updatedAt
+  usuario         Usuario      @relation(fields: [usuario_id], references: [id])
+  lancamento      Transaction? @relation(fields: [lancamento_id], references: [id])
+
+  @@map("reembolsos")
 }

@@ -5,13 +5,18 @@ import { prisma } from '@/lib/prisma';
 import { put } from '@vercel/blob';
 
 async function uploadFileToStorage(path: string, file: File) {
+  const buffer = Buffer.from(await file.arrayBuffer());
+
   if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const blob = await put(path, file, { access: 'public', addRandomSuffix: true });
+    const blob = await put(path, buffer, {
+      access: 'public',
+      addRandomSuffix: true,
+      contentType: file.type,
+    });
     return blob.url;
   }
 
   // Fallback local/dev quando token do Blob não estiver configurado.
-  const buffer = Buffer.from(await file.arrayBuffer());
   const mimeType = file.type || 'application/octet-stream';
   return `data:${mimeType};base64,${buffer.toString('base64')}`;
 }
@@ -38,7 +43,7 @@ export async function getCurrentMonth() {
       orderBy: [{ year: 'desc' }, { month: 'desc' }],
       take: 1,
     });
-    
+
     if (months.length > 0) return months[0];
 
     // Cenário de primeiro acesso: criar o primeiro mês automaticamente
@@ -52,7 +57,7 @@ export async function getCurrentMonth() {
           initialBalance: 5000, // Saldo inicial padrão
           finalBalance: 5000,
           isClosed: false,
-        }
+        },
       });
       return newMonth;
     }
@@ -71,7 +76,7 @@ export async function closeMonth(monthId: string) {
   });
 
   if (!currentMonth || currentMonth.isClosed) {
-   return { success: false, error: 'Mês não encontrado ou já está fechado.' };
+    return { success: false, error: 'Mês não encontrado ou já está fechado.' };
   }
 
   // Calcular saldo final dinamicamente com base nas transações concluídas
@@ -111,11 +116,15 @@ export async function closeMonth(monthId: string) {
       }),
     ]);
 
-  revalidatePath('/');
+    revalidatePath('/');
     return { success: true };
   } catch (error: unknown) {
     console.error('ERRO AO FECHAR MÊS:', error);
-    return { success: false, error: 'Não foi possível fechar o mês. Verifique se já existe um mês aberto para o período seguinte.' };
+    return {
+      success: false,
+      error:
+        'Não foi possível fechar o mês. Verifique se já existe um mês aberto para o período seguinte.',
+    };
   }
 }
 
@@ -124,7 +133,7 @@ export async function reopenMonth(monthId: string) {
     const month = await prisma.monthBalance.findUnique({
       where: { id: monthId },
     });
-    
+
     if (!month || !month.isClosed) {
       return { success: false, error: 'Mês não encontrado ou já está aberto.' };
     }
@@ -140,32 +149,40 @@ export async function reopenMonth(monthId: string) {
     // Verificar se o próximo mês existe e possui transações
     const nextMonth = await prisma.monthBalance.findUnique({
       where: { month_year: { month: nextMonthNumber, year: nextYear } },
-      include: { transactions: true }
+      include: { transactions: true },
     });
 
     if (nextMonth) {
       if (nextMonth.isClosed) {
-        return { success: false, error: 'Não é possível reabrir este mês pois o mês seguinte também já foi fechado.' };
+        return {
+          success: false,
+          error:
+            'Não é possível reabrir este mês pois o mês seguinte também já foi fechado.',
+        };
       }
       if (nextMonth.transactions.length > 0) {
-        return { success: false, error: 'Não é possível reabrir este mês pois o mês seguinte já possui transações. Exclua ou mova as transações do mês seguinte primeiro.' };
+        return {
+          success: false,
+          error:
+            'Não é possível reabrir este mês pois o mês seguinte já possui transações. Exclua ou mova as transações do mês seguinte primeiro.',
+        };
       }
-      
+
       // Excluir o próximo mês porque está vazio
       await prisma.$transaction([
         prisma.monthBalance.delete({
-          where: { id: nextMonth.id }
+          where: { id: nextMonth.id },
         }),
         prisma.monthBalance.update({
           where: { id: monthId },
-          data: { isClosed: false }
-        })
+          data: { isClosed: false },
+        }),
       ]);
     } else {
       // Apenas reabrir
       await prisma.monthBalance.update({
         where: { id: monthId },
-        data: { isClosed: false }
+        data: { isClosed: false },
       });
     }
 
@@ -207,14 +224,18 @@ export async function addTransaction(formData: FormData) {
       return { success: false, error: 'Mês não encontrado.' };
     }
     if (month.isClosed) {
-      return { success: false, error: 'Não é possível adicionar transação em mês fechado.' };
+      return {
+        success: false,
+        error: 'Não é possível adicionar transação em mês fechado.',
+      };
     }
 
     const description = formData.get('description') as string;
     const type = formData.get('type') as 'IN' | 'OUT';
     const amount = parseFloat(formData.get('amount') as string);
     const dateStr = formData.get('date') as string;
-    const status = (formData.get('status') as 'PENDING' | 'COMPLETED') || 'COMPLETED';
+    const status =
+      (formData.get('status') as 'PENDING' | 'COMPLETED') || 'COMPLETED';
 
     if (!dateStr || isNaN(new Date(dateStr).getTime())) {
       return { success: false, error: 'Por favor, insira uma data válida.' };
@@ -235,7 +256,9 @@ export async function addTransaction(formData: FormData) {
       ...(formData.getAll('files') as File[]),
       formData.get('file') as File | null,
     ];
-    const files = rawFiles.filter((file): file is File => !!file && file.size > 0);
+    const files = rawFiles.filter(
+      (file): file is File => !!file && file.size > 0,
+    );
 
     if (files.length > 0) {
       const uploadedAttachments = await Promise.all(
@@ -278,7 +301,10 @@ export async function updateTransaction(formData: FormData) {
       return { success: false, error: 'Transação não encontrada.' };
     }
     if (transaction.monthBalance.isClosed) {
-      return { success: false, error: 'Não é possível editar transação de um mês fechado.' };
+      return {
+        success: false,
+        error: 'Não é possível editar transação de um mês fechado.',
+      };
     }
 
     const description = formData.get('description') as string;
@@ -307,7 +333,9 @@ export async function updateTransaction(formData: FormData) {
       ...(formData.getAll('files') as File[]),
       formData.get('file') as File | null,
     ];
-    const files = rawFiles.filter((file): file is File => !!file && file.size > 0);
+    const files = rawFiles.filter(
+      (file): file is File => !!file && file.size > 0,
+    );
 
     if (files.length > 0) {
       const uploadedAttachments = await Promise.all(
@@ -345,7 +373,10 @@ export async function completePayment(id: string) {
     });
 
     if (!transaction || transaction.monthBalance.isClosed) {
-      return { success: false, error: 'Não é possível alterar transação de um mês fechado.' };
+      return {
+        success: false,
+        error: 'Não é possível alterar transação de um mês fechado.',
+      };
     }
 
     await prisma.transaction.update({
@@ -372,7 +403,10 @@ export async function deleteTransaction(id: string) {
       return { success: false, error: 'Transação não encontrada.' };
     }
     if (transaction.monthBalance.isClosed) {
-      return { success: false, error: 'Não é possível excluir transação de um mês fechado.' };
+      return {
+        success: false,
+        error: 'Não é possível excluir transação de um mês fechado.',
+      };
     }
 
     await prisma.transaction.delete({
@@ -393,7 +427,10 @@ export async function uploadMonthReport(formData: FormData) {
     const file = formData.get('reportFile') as File | null;
 
     if (!monthId || !file || file.size === 0) {
-      return { success: false, error: 'Informe um arquivo válido para o relatório.' };
+      return {
+        success: false,
+        error: 'Informe um arquivo válido para o relatório.',
+      };
     }
 
     const month = await prisma.monthBalance.findUnique({

@@ -2,29 +2,67 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyToken } from './lib/auth';
 
-export async function proxy(request: NextRequest) {
-  const token = request.cookies.get('auth_token')?.value;
-  const isLoginPage = request.nextUrl.pathname === '/login';
+const publicRoutes = [
+  '/',
+  '/financas/login',
+  '/reembolso/login',
+  '/reembolso/cadastro',
+];
 
-  // Se não houver token e não estiver na página de login, redirecionar para login
-  if (!token && !isLoginPage) {
-    return NextResponse.redirect(new URL('/login', request.url));
+function redirectByProfile(perfil: 'financas' | 'equipe') {
+  return perfil === 'financas'
+    ? '/financas/dashboard'
+    : '/reembolso/minhas-solicitacoes';
+}
+
+export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  if (pathname === '/login') {
+    return NextResponse.redirect(new URL('/financas/login', request.url));
   }
 
-  // Se existir token, validar
-  if (token) {
-    const payload = await verifyToken(token);
-    if (!payload && !isLoginPage) {
-      // Token inválido
-      const response = NextResponse.redirect(new URL('/login', request.url));
-      response.cookies.delete('auth_token');
-      return response;
-    }
+  if (pathname === '/report') {
+    return NextResponse.redirect(new URL('/financas/report', request.url));
+  }
 
-    // Se o token for válido e estiver tentando acessar login, redirecionar para home
-    if (payload && isLoginPage) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
+  const isPublicRoute = publicRoutes.includes(pathname);
+  const isFinancasRoute = pathname === '/financas' || pathname.startsWith('/financas/');
+  const isReembolsoRoute =
+    pathname === '/reembolso' || pathname.startsWith('/reembolso/');
+  const isProtectedModuleRoute =
+    (isFinancasRoute || isReembolsoRoute) && !isPublicRoute;
+
+  const token = request.cookies.get('auth_token')?.value;
+  const payload = token ? await verifyToken(token) : null;
+
+  if (token && !payload) {
+    const response = NextResponse.redirect(new URL('/', request.url));
+    response.cookies.delete('auth_token');
+    return response;
+  }
+
+  if (payload && (pathname === '/financas/login' || pathname === '/reembolso/login')) {
+    return NextResponse.redirect(
+      new URL(redirectByProfile(payload.perfil), request.url),
+    );
+  }
+
+  if (!isProtectedModuleRoute) {
+    return NextResponse.next();
+  }
+
+  if (!payload) {
+    const loginPath = isFinancasRoute ? '/financas/login' : '/reembolso/login';
+    return NextResponse.redirect(new URL(loginPath, request.url));
+  }
+
+  if (isFinancasRoute && payload.perfil !== 'financas') {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  if (isReembolsoRoute && payload.perfil !== 'equipe') {
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   return NextResponse.next();
