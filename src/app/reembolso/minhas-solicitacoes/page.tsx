@@ -2,6 +2,7 @@ import Link from 'next/link';
 import PrivateRoute from '@/components/PrivateRoute';
 import ReembolsoTopbar from '@/components/reembolso/ReembolsoTopbar';
 import { listarMinhasSolicitacoes } from '@/app/actions/reembolsos';
+import { formatDateUTC } from '@/lib/date-utils';
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', {
@@ -82,7 +83,7 @@ export default async function MinhasSolicitacoesPage() {
                         {statusBadge(item.status)}
                       </div>
                       <p className="mt-2 text-sm text-zinc-400">
-                        {new Date(item.criado_em).toLocaleDateString('pt-BR')} ·{' '}
+                        {formatDateUTC(item.criado_em)} ·{' '}
                         {item.equipe}
                       </p>
                     </div>

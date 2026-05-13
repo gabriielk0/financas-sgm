@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { aprovarReembolso, rejeitarReembolso } from '@/app/actions/reembolsos';
 import type { ReembolsoPendente } from '@/types/reembolso';
+import { formatDateUTC } from '@/lib/date-utils';
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', {
@@ -130,9 +131,7 @@ export default function ReembolsosFinanceTable({
                       {reembolso.chave_pix}
                     </td>
                     <td className="px-4 py-4 text-sm text-zinc-400">
-                      {new Date(reembolso.criado_em).toLocaleDateString(
-                        'pt-BR',
-                      )}
+                      {formatDateUTC(reembolso.criado_em)}
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex justify-end gap-2">
@@ -205,7 +204,7 @@ export default function ReembolsosFinanceTable({
               <Detail label="WhatsApp" value={selected.usuario.whatsapp} />
               <Detail
                 label="Data"
-                value={new Date(selected.criado_em).toLocaleString('pt-BR')}
+                value={formatDateUTC(selected.criado_em)}
               />
             </div>
 

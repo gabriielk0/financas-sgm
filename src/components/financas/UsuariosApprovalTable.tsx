@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, XCircle, Trash2, Plus, X } from 'lucide-react';
 import { Usuario } from '@prisma/client';
+import { formatDateUTC } from '@/lib/date-utils';
 import {
   atualizarUsuarioStatus,
   excluirUsuario,
@@ -141,7 +142,7 @@ export default function UsuariosApprovalTable({
                       </span>
                     </td>
                     <td className="px-4 py-4 text-sm text-zinc-400">
-                      {new Date(usuario.criado_em).toLocaleDateString('pt-BR')}
+                      {formatDateUTC(usuario.criado_em)}
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex justify-end gap-2">
