@@ -34,8 +34,8 @@ export default function AuthLoginForm({ modulo }: AuthLoginFormProps) {
     });
 
     if (result.success && 'token' in result) {
-      localStorage.setItem('token', result.token);
-      localStorage.setItem('perfil', result.perfil);
+      localStorage.setItem('token', result.token as string);
+      localStorage.setItem('perfil', result.perfil as string);
       localStorage.setItem('usuario', JSON.stringify(result.user));
       router.replace(result.redirectTo || '/');
       router.refresh();

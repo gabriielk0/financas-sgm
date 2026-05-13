@@ -2,6 +2,7 @@ import { getCurrentMonth, getMonths, getTransactions } from '../actions/finance'
 import { format } from 'date-fns';
 import PrintButton from '@/components/PrintButton';
 import { Transaction } from '@prisma/client';
+import { formatDateUTC } from '@/lib/date-utils';
 
 export default async function ReportPage(
   props: {
@@ -138,7 +139,7 @@ if (!activeMonth) {
                 ) : (
                   incomes.map(t => (
                     <tr key={t.id}>
-                      <td className="py-2 px-2">{format(new Date(t.date), 'dd/MM/yyyy')}</td>
+                      <td className="py-2 px-2">{formatDateUTC(t.date)}</td>
                       <td className="py-2 px-2">{t.description}</td>
                       <td className="py-2 px-2 text-right">{formatCurrency(t.amount)}</td>
                     </tr>
@@ -177,7 +178,7 @@ if (!activeMonth) {
                 ) : (
                   expenses.map(t => (
                     <tr key={t.id}>
-                      <td className="py-2 px-2">{format(new Date(t.date), 'dd/MM/yyyy')}</td>
+                      <td className="py-2 px-2">{formatDateUTC(t.date)}</td>
                       <td className="py-2 px-2">{t.description}</td>
                       <td className="py-2 px-2 text-right">{formatCurrency(t.amount)}</td>
                     </tr>

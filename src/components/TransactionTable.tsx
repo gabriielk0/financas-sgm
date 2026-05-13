@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { format } from 'date-fns';
+import { formatDateUTC } from '@/lib/date-utils';
 import {
   Plus,
   Eye,
@@ -159,7 +159,7 @@ export default function TransactionTable({
                     className="hover:bg-zinc-800/30 transition-colors"
                   >
                     <td className="px-6 py-4 text-sm text-zinc-300">
-                      {format(new Date(t.date), 'dd/MM/yyyy')}
+                      {formatDateUTC(t.date)}
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-zinc-100">
                       {t.description}
