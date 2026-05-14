@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Check } from 'lucide-react';
 import PrivateRoute from '@/components/PrivateRoute';
 import ReembolsoTopbar from '@/components/reembolso/ReembolsoTopbar';
 import { listarMinhasSolicitacoes } from '@/app/actions/reembolsos';
@@ -86,15 +87,64 @@ export default async function MinhasSolicitacoesPage() {
                         {item.equipe}
                       </p>
                     </div>
-                    <p className="text-lg font-semibold text-white">
-                      {formatCurrency(item.valor)}
-                    </p>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-white">
+                        {formatCurrency(item.valor)}
+                      </p>
+                      {item.valor_aprovado !== null && item.valor_aprovado !== item.valor && (
+                        <p className="mt-1 text-sm font-medium text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded inline-block">
+                          Aprovado: {formatCurrency(item.valor_aprovado)}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {item.status === 'rejeitado' && item.motivo_rejeicao && (
                     <div className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-100">
                       <strong className="text-rose-200">Motivo:</strong>{' '}
                       {item.motivo_rejeicao}
+                    </div>
+                  )}
+
+                  {/* TIMELINE AQUI */}
+                  {item.historico && item.historico.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-zinc-800/50">
+                      <h3 className="text-sm font-medium text-zinc-300 mb-4">Acompanhamento</h3>
+                      <div className="space-y-4">
+                        {item.historico.map((hist: any, index: number) => (
+                          <div key={hist.id} className="flex gap-4 relative">
+                            {/* Linha conectora */}
+                            {index !== item.historico.length - 1 && (
+                              <div className="absolute left-[11px] top-7 bottom-[-16px] w-0.5 bg-zinc-800"></div>
+                            )}
+                            <div className={`mt-1 h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-2 bg-zinc-900 z-10 ${
+                              hist.acao === 'CRIADO' ? 'border-zinc-500' :
+                              hist.acao === 'APROVADO' ? 'border-emerald-500' :
+                              hist.acao === 'PAGO' ? 'border-indigo-500 bg-indigo-500' :
+                              hist.acao === 'REJEITADO' ? 'border-rose-500' :
+                              hist.acao === 'VALOR_ALTERADO' ? 'border-amber-500' :
+                              'border-zinc-600'
+                            }`}>
+                              {hist.acao === 'PAGO' && <Check className="w-3 h-3 text-white" />}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-zinc-200">
+                                  {hist.acao === 'CRIADO' ? 'Solicitação Enviada' :
+                                  hist.acao === 'APROVADO' ? 'Aprovado' :
+                                  hist.acao === 'PAGO' ? 'Pago' :
+                                  hist.acao === 'REJEITADO' ? 'Rejeitado' :
+                                  hist.acao === 'VALOR_ALTERADO' ? 'Valor Alterado' : hist.acao}
+                                </span>
+                                <span className="text-xs text-zinc-500">
+                                  {new Date(hist.criado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                </span>
+                              </div>
+                              <p className="text-sm text-zinc-400 mt-1">{hist.descricao}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </article>

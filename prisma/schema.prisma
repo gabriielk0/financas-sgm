@@ -32,6 +32,8 @@ model Transaction {
   type          String       // "IN" ou "OUT"
   amount        Float
   status        String       @default("COMPLETED") // "PENDING" ou "COMPLETED"
+  area          String       @default("Outros")
+  internalNotes String?
   monthId       String
   referenceType String?
   referenceId   String?
@@ -61,8 +63,9 @@ model Usuario {
   senha      String
   status     String      @default("aguardando_aprovacao")
   perfil     String      @default("equipe")
-  criado_em  DateTime    @default(now())
-  reembolsos Reembolso[]
+  criado_em       DateTime    @default(now())
+  reembolsos      Reembolso[]
+  historico_acoes ReembolsoHistory[]
 
   @@map("usuarios")
 }
@@ -77,6 +80,7 @@ model Reembolso {
   valor           Float
   chave_pix       String
   anexo_url       String
+  valor_aprovado  Float?
   status          String       @default("pendente_reembolso")
   motivo_rejeicao String?
   lancamento_id   String?      @unique
@@ -84,6 +88,21 @@ model Reembolso {
   atualizado_em   DateTime     @updatedAt
   usuario         Usuario      @relation(fields: [usuario_id], references: [id])
   lancamento      Transaction? @relation(fields: [lancamento_id], references: [id])
+  historico       ReembolsoHistory[]
 
   @@map("reembolsos")
+}
+
+model ReembolsoHistory {
+  id              String    @id @default(uuid())
+  reembolso_id    String
+  usuario_id      String?
+  acao            String    // "CRIADO", "EM_ANALISE", "APROVADO", "REJEITADO", "PAGO", "EDICAO"
+  descricao       String
+  criado_em       DateTime  @default(now())
+  
+  reembolso       Reembolso @relation(fields: [reembolso_id], references: [id], onDelete: Cascade)
+  usuario         Usuario?  @relation(fields: [usuario_id], references: [id])
+
+  @@map("reembolso_history")
 }

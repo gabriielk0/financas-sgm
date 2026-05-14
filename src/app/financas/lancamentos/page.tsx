@@ -2,6 +2,7 @@ import DashboardStats from '@/components/DashboardStats';
 import FinanceHeaderControls from '@/components/financas/FinanceHeaderControls';
 import FinancasFrame from '@/components/financas/FinancasFrame';
 import TransactionTable from '@/components/TransactionTable';
+import TransactionFilters from '@/components/TransactionFilters';
 import { getFinanceViewData } from '../finance-data';
 
 export default async function FinancasLancamentosPage(props: {
@@ -43,11 +44,14 @@ export default async function FinancasLancamentosPage(props: {
             />
 
             {view === 'monthly' ? (
-              <TransactionTable
-                transactions={transactions}
-                monthClosed={activeMonth.isClosed}
-                monthId={activeMonth.id}
-              />
+              <>
+                <TransactionFilters />
+                <TransactionTable
+                  transactions={transactions}
+                  monthClosed={activeMonth.isClosed}
+                  monthId={activeMonth.id}
+                />
+              </>
             ) : (
               <div className="mt-8 rounded-lg border border-zinc-800 bg-zinc-900 p-6 text-center text-sm text-zinc-400">
                 A tabela detalhada fica disponível na visão mensal.

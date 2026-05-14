@@ -6,12 +6,12 @@ import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { cadastroAction } from '@/app/actions/auth';
 
 const equipes = [
-  'Gráfica',
-  'Comunicação',
-  'Administrativo',
-  'Coordenação',
-  'TI',
-  'Outro',
+  'Comando',
+  'Fichas',
+  'Pós-encontro',
+  'Montagem',
+  'Palestras',
+  'Prover',
 ];
 
 export default function CadastroReembolsoForm() {

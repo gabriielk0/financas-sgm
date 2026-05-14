@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { put } from '@vercel/blob';
+import { getCurrentSession } from './auth';
 
 async function uploadFileToStorage(path: string, file: File) {
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -198,11 +199,53 @@ export async function reopenMonth(monthId: string) {
 // ACOES DE TRANSACAO
 // ==========================
 
-export async function getTransactions(monthId: string) {
+export async function getTransactions(monthId: string, filters?: {
+  search?: string;
+  area?: string;
+  status?: string;
+  type?: string;
+  minAmount?: number;
+  maxAmount?: number;
+}) {
   try {
+    const whereClause: any = { monthId };
+
+    if (filters) {
+      if (filters.area) whereClause.area = filters.area;
+      if (filters.status) whereClause.status = filters.status;
+      if (filters.type) whereClause.type = filters.type;
+      
+      if (filters.minAmount !== undefined || filters.maxAmount !== undefined) {
+        whereClause.amount = {};
+        if (filters.minAmount !== undefined) whereClause.amount.gte = filters.minAmount;
+        if (filters.maxAmount !== undefined) whereClause.amount.lte = filters.maxAmount;
+      }
+
+      if (filters.search) {
+        whereClause.OR = [
+          { description: { contains: filters.search, mode: 'insensitive' } },
+          { internalNotes: { contains: filters.search, mode: 'insensitive' } },
+          {
+            reembolso: {
+              is: {
+                nome_pagador: { contains: filters.search, mode: 'insensitive' },
+              },
+            },
+          },
+          {
+            reembolso: {
+              is: {
+                finalidade: { contains: filters.search, mode: 'insensitive' },
+              },
+            },
+          },
+        ];
+      }
+    }
+
     return await prisma.transaction.findMany({
-      where: { monthId },
-      include: { attachments: true },
+      where: whereClause,
+      include: { attachments: true, reembolso: true },
       orderBy: { date: 'desc' },
     });
   } catch (error: unknown) {
@@ -236,6 +279,8 @@ export async function addTransaction(formData: FormData) {
     const dateStr = formData.get('date') as string;
     const status =
       (formData.get('status') as 'PENDING' | 'COMPLETED') || 'COMPLETED';
+    const area = (formData.get('area') as string) || 'Outros';
+    const internalNotes = formData.get('internalNotes') as string | null;
 
     if (!dateStr || isNaN(new Date(dateStr).getTime())) {
       return { success: false, error: 'Por favor, insira uma data válida.' };
@@ -249,6 +294,8 @@ export async function addTransaction(formData: FormData) {
         amount,
         status,
         monthId,
+        area,
+        internalNotes,
       },
     });
 
@@ -312,6 +359,7 @@ export async function updateTransaction(formData: FormData) {
     const amountStr = formData.get('amount') as string;
     const dateStr = formData.get('date') as string;
     const status = formData.get('status') as 'PENDING' | 'COMPLETED';
+    const area = formData.get('area') as string;
 
     if (!dateStr || isNaN(new Date(dateStr).getTime())) {
       return { success: false, error: 'Por favor, insira uma data válida.' };
@@ -323,6 +371,10 @@ export async function updateTransaction(formData: FormData) {
     if (amountStr) dataToUpdate.amount = parseFloat(amountStr);
     if (dateStr) dataToUpdate.date = new Date(dateStr);
     if (status) dataToUpdate.status = status;
+    if (area) dataToUpdate.area = area;
+    if (formData.has('internalNotes')) {
+      dataToUpdate.internalNotes = formData.get('internalNotes') as string;
+    }
 
     await prisma.transaction.update({
       where: { id },
@@ -383,6 +435,18 @@ export async function completePayment(id: string) {
       where: { id },
       data: { status: 'COMPLETED' },
     });
+
+    if (transaction.referenceType === 'reembolso' && transaction.referenceId) {
+      const session = await getCurrentSession();
+      await prisma.reembolsoHistory.create({
+        data: {
+          reembolso_id: transaction.referenceId,
+          usuario_id: session?.usuarioId,
+          acao: 'PAGO',
+          descricao: 'Lançamento financeiro marcado como pago / concluído.',
+        }
+      });
+    }
 
     revalidatePath('/');
     return { success: true };

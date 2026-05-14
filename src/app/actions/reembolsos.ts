@@ -68,7 +68,7 @@ export async function solicitarReembolso(formData: FormData) {
 
     const anexo_url = await uploadFileToStorage(session.usuarioId, file);
 
-    await prisma.reembolso.create({
+    const reembolso = await prisma.reembolso.create({
       data: {
         usuario_id: session.usuarioId,
         nome_pagador,
@@ -80,6 +80,15 @@ export async function solicitarReembolso(formData: FormData) {
         anexo_url,
         status: 'pendente_reembolso',
       },
+    });
+
+    await prisma.reembolsoHistory.create({
+      data: {
+        reembolso_id: reembolso.id,
+        usuario_id: session.usuarioId,
+        acao: 'CRIADO',
+        descricao: 'Solicitação de reembolso criada e enviada para análise.',
+      }
     });
 
     revalidateReembolsoViews();
@@ -101,6 +110,12 @@ export async function listarMinhasSolicitacoes() {
 
     return await prisma.reembolso.findMany({
       where: { usuario_id: session.usuarioId },
+      include: {
+        historico: {
+          orderBy: { criado_em: 'asc' },
+        },
+        lancamento: true,
+      },
       orderBy: { criado_em: 'desc' },
     });
   } catch (error) {
@@ -109,16 +124,36 @@ export async function listarMinhasSolicitacoes() {
   }
 }
 
-export async function listarReembolsosPendentes() {
+export async function listarReembolsosFinanceiro(filtros?: {
+  busca?: string;
+  status?: string;
+  equipe?: string;
+}) {
   try {
     const session = await getCurrentSession();
 
     if (session?.perfil !== 'financas') return [];
 
+    const whereClause: any = {};
+    if (filtros?.status) whereClause.status = filtros.status;
+    if (filtros?.equipe) whereClause.equipe = filtros.equipe;
+    if (filtros?.busca) {
+      whereClause.OR = [
+        { nome_pagador: { contains: filtros.busca, mode: 'insensitive' } },
+        { descricao: { contains: filtros.busca, mode: 'insensitive' } },
+        { finalidade: { contains: filtros.busca, mode: 'insensitive' } },
+        { usuario: { nome: { contains: filtros.busca, mode: 'insensitive' } } }
+      ];
+    }
+
     return await prisma.reembolso.findMany({
-      where: { status: 'pendente_reembolso' },
-      include: { usuario: true },
-      orderBy: { criado_em: 'asc' },
+      where: whereClause,
+      include: { 
+        usuario: true,
+        historico: { orderBy: { criado_em: 'asc' } },
+        lancamento: true 
+      },
+      orderBy: { criado_em: 'desc' },
     });
   } catch (error) {
     console.error('ERRO AO LISTAR REEMBOLSOS:', error);
@@ -141,7 +176,11 @@ export async function contarReembolsosPendentes() {
   }
 }
 
-export async function aprovarReembolso(reembolsoId: string) {
+export async function aprovarReembolso(
+  reembolsoId: string, 
+  valorAprovado?: number, 
+  justificativa?: string
+) {
   try {
     const session = await getCurrentSession();
 
@@ -170,22 +209,54 @@ export async function aprovarReembolso(reembolsoId: string) {
     }
 
     await prisma.$transaction(async (tx) => {
+      const valorFinal = valorAprovado !== undefined && valorAprovado >= 0 ? valorAprovado : reembolso.valor;
+
       const transaction = await tx.transaction.create({
         data: {
           date: new Date(),
           description: `Reembolso — ${reembolso.descricao} (${reembolso.equipe})`,
           type: 'OUT',
-          amount: reembolso.valor,
+          amount: valorFinal,
           status: 'PENDING',
           monthId: currentMonth.id,
           referenceType: 'reembolso',
           referenceId: reembolso.id,
+          attachments: {
+            create: {
+              url: reembolso.anexo_url,
+              filename: `Comprovante - ${reembolso.descricao}`,
+            }
+          }
         },
       });
 
       await tx.reembolso.update({
         where: { id: reembolsoId },
-        data: { status: 'aprovado', lancamento_id: transaction.id },
+        data: { 
+          status: 'aprovado', 
+          lancamento_id: transaction.id,
+          ...(valorAprovado !== undefined && { valor_aprovado: valorFinal }) 
+        },
+      });
+
+      if (valorAprovado !== undefined && valorAprovado !== reembolso.valor) {
+        await tx.reembolsoHistory.create({
+          data: {
+            reembolso_id: reembolsoId,
+            usuario_id: session.usuarioId,
+            acao: 'VALOR_ALTERADO',
+            descricao: `Valor alterado de R$ ${reembolso.valor} para R$ ${valorAprovado}. Justificativa: ${justificativa || 'Nenhuma justificativa informada.'}`,
+          }
+        });
+      }
+
+      await tx.reembolsoHistory.create({
+        data: {
+          reembolso_id: reembolsoId,
+          usuario_id: session.usuarioId,
+          acao: 'APROVADO',
+          descricao: 'Reembolso aprovado pelo financeiro e convertido em lançamento.',
+        }
       });
     });
 
@@ -211,9 +282,20 @@ export async function rejeitarReembolso(reembolsoId: string, motivo: string) {
       return { success: false, error: 'Informe o motivo da rejeição.' };
     }
 
-    await prisma.reembolso.update({
-      where: { id: reembolsoId },
-      data: { status: 'rejeitado', motivo_rejeicao },
+    await prisma.$transaction(async (tx) => {
+      await tx.reembolso.update({
+        where: { id: reembolsoId },
+        data: { status: 'rejeitado', motivo_rejeicao },
+      });
+
+      await tx.reembolsoHistory.create({
+        data: {
+          reembolso_id: reembolsoId,
+          usuario_id: session.usuarioId,
+          acao: 'REJEITADO',
+          descricao: `Solicitação rejeitada. Motivo: ${motivo_rejeicao}`,
+        }
+      });
     });
 
     revalidateReembolsoViews();

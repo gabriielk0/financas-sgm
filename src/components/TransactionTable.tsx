@@ -61,10 +61,12 @@ export default function TransactionTable({
   const typeFilter = searchParams.get('typeFilter');
 
   const filteredTransactions = transactions.filter((t) => {
+    // A filtragem principal agora ocorre no servidor (getTransactions)
+    // Manter este filtro caso a prop venha do pai e ainda queira filtrar no cliente.
     if (typeFilter === 'IN' || typeFilter === 'OUT') {
       return t.type === typeFilter;
     }
-    return true; // se não houver filtro ou ele for inválido, retorna tudo
+    return true; 
   });
 
   const formatCurrency = (value: number) =>
@@ -134,7 +136,8 @@ export default function TransactionTable({
               <tr className="bg-zinc-900/80 text-zinc-400 text-xs uppercase tracking-wider">
                 <th className="px-6 py-4 font-medium">Data</th>
                 <th className="px-6 py-4 font-medium">Descrição</th>
-                <th className="px-6 py-4 font-medium">Categoria</th>
+                <th className="px-6 py-4 font-medium">Área/Equipe</th>
+                <th className="px-6 py-4 font-medium">Tipo</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium text-right">Valor</th>
                 <th className="px-6 py-4 font-medium text-center">Ações</th>
@@ -162,7 +165,17 @@ export default function TransactionTable({
                       {format(new Date(t.date), 'dd/MM/yyyy')}
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-zinc-100">
-                      {t.description}
+                      <div>{t.description}</div>
+                      {t.internalNotes && (
+                        <div className="mt-1 text-xs text-zinc-500 font-normal">
+                          <span className="font-medium text-zinc-400">Obs:</span> {t.internalNotes}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-zinc-800 text-zinc-300 border border-zinc-700">
+                        {t.area || 'Outros'}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <span

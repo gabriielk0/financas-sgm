@@ -2,13 +2,33 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, UploadCloud, FileText, Trash2 } from 'lucide-react';
+import { X, UploadCloud, FileText, Trash2, Receipt, Info } from 'lucide-react';
 import {
   addTransaction,
   updateTransaction,
   deleteTransaction,
 } from '@/app/actions/finance';
 import type { TransactionWithAttachments } from '@/types/finance';
+
+const AREAS = [
+  'Gráfica',
+  'Alimentação',
+  'Lanche',
+  'Mini mercado',
+  'Estacionamento',
+  'Círculo',
+  'Sala',
+  'Faxina',
+  'Liturgia e vigília',
+  'Visitação',
+  'Vigília paroquial',
+  'Animação',
+  'Canto',
+  'Prover',
+  'Equipe dirigente',
+  'Comando',
+  'Outros'
+];
 
 export default function TransactionModal({
   isOpen,
@@ -19,6 +39,7 @@ export default function TransactionModal({
   isOpen: boolean;
   onClose: () => void;
   monthId: string;
+
   transactionToEdit?: TransactionWithAttachments | null;
 }) {
   const [loading, setLoading] = useState(false);
@@ -29,6 +50,8 @@ export default function TransactionModal({
     type: 'OUT' as 'IN' | 'OUT',
     date: new Date().toISOString().split('T')[0],
     status: 'COMPLETED' as 'COMPLETED' | 'PENDING',
+    area: 'Outros',
+    internalNotes: '',
   });
   const [files, setFiles] = useState<File[]>([]);
   const [preview, setPreview] = useState<string | null>(null);
@@ -47,6 +70,8 @@ export default function TransactionModal({
         type,
         date: new Date(transactionToEdit.date).toISOString().split('T')[0],
         status,
+        area: transactionToEdit.area || 'Outros',
+        internalNotes: transactionToEdit.internalNotes || '',
       });
       setFiles([]);
       setPreview(null);
@@ -59,6 +84,8 @@ export default function TransactionModal({
         type: 'OUT',
         date: new Date().toISOString().split('T')[0],
         status: 'COMPLETED',
+        area: 'Outros',
+        internalNotes: '',
       });
       setFiles([]);
       setPreview(null);
@@ -92,6 +119,10 @@ export default function TransactionModal({
       submitData.append('type', formData.type);
       submitData.append('date', formData.date);
       submitData.append('status', formData.status);
+      submitData.append('area', formData.area);
+      if (formData.internalNotes) {
+        submitData.append('internalNotes', formData.internalNotes);
+      }
 
       files.forEach((selectedFile) => {
         submitData.append('files', selectedFile);
@@ -140,11 +171,16 @@ export default function TransactionModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-hidden">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[95vh] animate-in fade-in zoom-in-95 duration-200">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between p-6 border-b border-zinc-800 shrink-0">
-          <h2 className="text-xl font-semibold text-white">
-            {transactionToEdit ? 'Editar Transação' : 'Nova Transação'}
+          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+            {transactionToEdit?.reembolso && <Receipt className="w-5 h-5 text-amber-400" />}
+            {transactionToEdit
+              ? transactionToEdit.reembolso
+                ? 'Lançamento de Reembolso'
+                : 'Editar Transação'
+              : 'Nova Transação'}
           </h2>
           <button
             onClick={onClose}
@@ -155,128 +191,213 @@ export default function TransactionModal({
         </div>
 
         {/* Formulário com rolagem */}
-        <div className="overflow-y-auto flex-1 p-6">
+        <div className="overflow-y-auto flex-1 p-6 md:p-8">
           <form
             id="transaction-form"
             onSubmit={handleSubmit}
-            className="space-y-4"
+            className="grid grid-cols-1 md:grid-cols-2 gap-8"
           >
-            <div>
+            {/* Coluna Esquerda: Dados Principais */}
+            <div className="space-y-5">
+              <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4 border-b border-zinc-800 pb-2">Informações Básicas</h3>
+              
               {submitError && (
-                <div className="mb-3 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+                <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
                   {submitError}
                 </div>
               )}
-              <label className="block text-sm font-medium text-zinc-300 mb-1">
-                Descrição
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+              
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1">
-                  Valor (R$)
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">
+                  Descrição do Lançamento
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
                   required
-                  value={formData.amount}
+                  disabled={!!transactionToEdit?.reembolso}
+                  value={formData.description}
                   onChange={(e) =>
-                    setFormData({ ...formData, amount: e.target.value })
+                    setFormData({ ...formData, description: e.target.value })
                   }
-                  className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:border-indigo-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">
+                    Valor (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    disabled={!!transactionToEdit?.reembolso}
+                    value={formData.amount}
+                    onChange={(e) =>
+                      setFormData({ ...formData, amount: e.target.value })
+                    }
+                    className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:border-indigo-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">
+                    Data
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    disabled={!!transactionToEdit?.reembolso}
+                    value={formData.date}
+                    onChange={(e) =>
+                      setFormData({ ...formData, date: e.target.value })
+                    }
+                    className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:border-indigo-500 focus:outline-none [color-scheme:dark] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1">
-                  Data
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">
+                  Área/Equipe
                 </label>
-                <input
-                  type="date"
+                <select
                   required
-                  value={formData.date}
+                  value={formData.area}
                   onChange={(e) =>
-                    setFormData({ ...formData, date: e.target.value })
+                    setFormData({ ...formData, area: e.target.value })
                   }
-                  className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none [color-scheme:dark]"
+                  className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:border-indigo-500 focus:outline-none transition-colors"
+                >
+                  {AREAS.map(area => (
+                    <option key={area} value={area}>{area}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">
+                  Classificação
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-2 bg-zinc-950 p-1.5 rounded-lg border border-zinc-800">
+                    <button
+                      type="button"
+                      disabled={!!transactionToEdit?.reembolso}
+                      onClick={() => setFormData({ ...formData, type: 'IN' })}
+                      className={`py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+                        formData.type === 'IN'
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      Entrada
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!!transactionToEdit?.reembolso}
+                      onClick={() => setFormData({ ...formData, type: 'OUT' })}
+                      className={`py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+                        formData.type === 'OUT'
+                          ? 'bg-rose-500/20 text-rose-400'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      Saída
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 bg-zinc-950 p-1.5 rounded-lg border border-zinc-800">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({ ...formData, status: 'COMPLETED' })
+                      }
+                      className={`py-2 rounded-md text-sm font-medium transition-colors ${
+                        formData.status === 'COMPLETED'
+                          ? 'bg-indigo-500/20 text-indigo-400'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      Concluído
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({ ...formData, status: 'PENDING' })
+                      }
+                      className={`py-2 rounded-md text-sm font-medium transition-colors ${
+                        formData.status === 'PENDING'
+                          ? 'bg-amber-500/20 text-amber-400'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      Pendente
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Coluna Direita: Anexos, Observações e Reembolso */}
+            <div className="space-y-5 flex flex-col">
+              <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4 border-b border-zinc-800 pb-2">Complementos</h3>
+              
+              {transactionToEdit?.reembolso && (
+                <div className="mb-6 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4 text-sm text-zinc-300">
+                  <div className="flex items-center gap-2 mb-3 text-indigo-400 font-medium">
+                    <Info className="w-4 h-4" />
+                    Detalhes do Reembolso Original
+                  </div>
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+                    <div>
+                      <span className="block text-xs text-zinc-500 mb-0.5">Solicitante</span>
+                      <span className="font-medium text-zinc-200">{transactionToEdit.reembolso.nome_pagador}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-zinc-500 mb-0.5">Equipe</span>
+                      <span className="font-medium text-zinc-200">{transactionToEdit.reembolso.equipe}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-xs text-zinc-500 mb-0.5">Finalidade</span>
+                      <span className="font-medium text-zinc-200">{transactionToEdit.reembolso.finalidade}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-xs text-zinc-500 mb-0.5">Chave PIX</span>
+                      <span className="font-medium text-zinc-200">{transactionToEdit.reembolso.chave_pix} <span className="text-zinc-500 font-normal">({transactionToEdit.reembolso.banco})</span></span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-zinc-500 mb-0.5">Status Original</span>
+                      <span className="font-medium text-amber-400">{transactionToEdit.reembolso.status}</span>
+                    </div>
+                  </div>
+                  {transactionToEdit.reembolso.observacoes && (
+                    <div className="mt-3 pt-3 border-t border-indigo-500/10">
+                      <span className="block text-xs text-zinc-500 mb-0.5">Observações do solicitante</span>
+                      <span className="text-zinc-300 italic">&quot;{transactionToEdit.reembolso.observacoes}&quot;</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex-1 flex flex-col min-h-0">
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">
+                  Observações Internas <span className="text-zinc-500 text-xs font-normal">(apenas admins)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={formData.internalNotes}
+                  onChange={(e) =>
+                    setFormData({ ...formData, internalNotes: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-300 focus:border-indigo-500 focus:outline-none transition-colors resize-none"
+                  placeholder="Anotações adicionais visíveis apenas para a administração..."
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">
-                Tipo e Status
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, type: 'IN' })}
-                    className={`py-2 rounded-lg text-sm font-medium border ${
-                      formData.type === 'IN'
-                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
-                        : 'bg-zinc-950 border-zinc-700 text-zinc-400 hover:bg-zinc-800'
-                    }`}
-                  >
-                    Entrada
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, type: 'OUT' })}
-                    className={`py-2 rounded-lg text-sm font-medium border ${
-                      formData.type === 'OUT'
-                        ? 'bg-rose-500/20 border-rose-500/50 text-rose-400'
-                        : 'bg-zinc-950 border-zinc-700 text-zinc-400 hover:bg-zinc-800'
-                    }`}
-                  >
-                    Saída
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormData({ ...formData, status: 'COMPLETED' })
-                    }
-                    className={`py-2 rounded-lg text-sm font-medium border ${
-                      formData.status === 'COMPLETED'
-                        ? 'bg-blue-500/20 border-blue-500/50 text-blue-400'
-                        : 'bg-zinc-950 border-zinc-700 text-zinc-400 hover:bg-zinc-800'
-                    }`}
-                  >
-                    Concluído
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormData({ ...formData, status: 'PENDING' })
-                    }
-                    className={`py-2 rounded-lg text-sm font-medium border ${
-                      formData.status === 'PENDING'
-                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
-                        : 'bg-zinc-950 border-zinc-700 text-zinc-400 hover:bg-zinc-800'
-                    }`}
-                  >
-                    Pendente
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">
-                Anexo (Recibo/Comprovante)
+            <div className="mt-2">
+              <label className="block text-sm font-medium text-zinc-300 mb-2">
+                Anexos (Recibos e Comprovantes)
               </label>
               {transactionToEdit && transactionToEdit.attachments.length > 0 && files.length === 0 && (
                 <div className="mb-2 flex flex-wrap gap-2">
@@ -304,39 +425,40 @@ export default function TransactionModal({
               />
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full flex flex-col items-center justify-center p-4 border-2 border-dashed border-zinc-700 rounded-xl bg-zinc-950/50 hover:bg-zinc-800/50 cursor-pointer transition-colors"
+                className="w-full flex flex-col items-center justify-center p-6 border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-950/50 hover:bg-zinc-900 cursor-pointer transition-colors"
               >
                 {preview ? (
                   <img
                     src={preview}
                     alt="Preview"
-                    className="max-h-32 rounded-lg object-contain"
+                    className="max-h-48 rounded-lg object-contain"
                   />
                 ) : files.length > 0 ? (
                   <div className="flex flex-col items-center text-indigo-400">
-                    <FileText className="w-8 h-8 mb-2" />
+                    <FileText className="w-10 h-10 mb-3" />
                     <span className="text-sm font-medium truncate max-w-[200px]">
                       {files.length === 1 ? files[0].name : `${files.length} arquivos selecionados`}
                     </span>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center text-zinc-500">
-                    <UploadCloud className="w-8 h-8 mb-2" />
-                    <span className="text-sm font-medium">
-                      Clique para enviar arquivo
+                    <UploadCloud className="w-10 h-10 mb-3 text-zinc-600" />
+                    <span className="text-sm font-medium text-zinc-300">
+                      Clique ou arraste para anexar
                     </span>
-                    <span className="text-xs mt-1">
-                      PDF, JPG, PNG (máx 5MB)
+                    <span className="text-xs mt-1.5 text-zinc-500">
+                      Formatos suportados: PDF, JPG, PNG (máx 5MB)
                     </span>
                   </div>
                 )}
               </div>
             </div>
+            </div>
           </form>
         </div>
 
-        {/* Rodapé */}
-        <div className="p-4 border-t border-zinc-800 shrink-0 flex justify-between bg-zinc-900">
+        {/* Rodapé Fixo */}
+        <div className="p-5 md:px-8 border-t border-zinc-800 shrink-0 flex justify-between items-center bg-zinc-900/80 backdrop-blur-md">
           {transactionToEdit ? (
             <button
               type="button"
@@ -355,7 +477,7 @@ export default function TransactionModal({
             type="submit"
             form="transaction-form"
             disabled={loading}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20"
           >
             {loading
               ? 'Salvando...'

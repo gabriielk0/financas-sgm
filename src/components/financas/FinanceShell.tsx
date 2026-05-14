@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BarChart3, ClipboardList, LogOut, ReceiptText, Users } from 'lucide-react';
+import { BarChart3, ClipboardList, LogOut, ReceiptText, Users, FileText } from 'lucide-react';
 import { logoutAction } from '@/app/actions/auth';
 
 const navItems = [
@@ -20,6 +20,11 @@ const navItems = [
     href: '/financas/reembolsos',
     label: 'Reembolsos',
     icon: ReceiptText,
+  },
+  {
+    href: '/financas/relatorios/consolidado',
+    label: 'Relatórios',
+    icon: FileText,
   },
   {
     href: '/financas/usuarios',

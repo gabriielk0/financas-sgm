@@ -1,9 +1,16 @@
 import FinancasFrame from '@/components/financas/FinancasFrame';
 import ReembolsosFinanceTable from '@/components/financas/ReembolsosFinanceTable';
-import { listarReembolsosPendentes } from '@/app/actions/reembolsos';
+import { listarReembolsosFinanceiro } from '@/app/actions/reembolsos';
 
-export default async function FinancasReembolsosPage() {
-  const reembolsos = await listarReembolsosPendentes();
+export default async function FinancasReembolsosPage(props: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const searchParams = await props.searchParams;
+  const busca = typeof searchParams?.busca === 'string' ? searchParams.busca : undefined;
+  const status = typeof searchParams?.status === 'string' ? searchParams.status : undefined;
+  const equipe = typeof searchParams?.equipe === 'string' ? searchParams.equipe : undefined;
+
+  const reembolsos = await listarReembolsosFinanceiro({ busca, status, equipe });
 
   return (
     <FinancasFrame>

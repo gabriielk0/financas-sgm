@@ -32,15 +32,24 @@ export async function getFinanceViewData(searchParams?: FinanceSearchParams) {
   let transactions: TransactionWithAttachments[] = [];
   const displayMonthBalance: MonthBalance = { ...activeMonth };
 
+  const filters = {
+    search: searchParams?.search as string | undefined,
+    area: searchParams?.area as string | undefined,
+    status: searchParams?.status as string | undefined,
+    type: searchParams?.typeFilter as string | undefined,
+    minAmount: searchParams?.minAmount ? parseFloat(searchParams.minAmount as string) : undefined,
+    maxAmount: searchParams?.maxAmount ? parseFloat(searchParams.maxAmount as string) : undefined,
+  };
+
   if (view === 'monthly') {
-    transactions = await getTransactions(activeMonth.id);
+    transactions = await getTransactions(activeMonth.id, filters);
   } else if (view === 'semiannual') {
     const currentIndex = monthsHistory.findIndex(
       (m) => m.id === activeMonth.id,
     );
     const targetMonths = monthsHistory.slice(currentIndex, currentIndex + 6);
     const allTransactions = await Promise.all(
-      targetMonths.map((month) => getTransactions(month.id)),
+      targetMonths.map((month) => getTransactions(month.id, filters)),
     );
     transactions = allTransactions.flat();
     displayMonthBalance.initialBalance =
@@ -48,7 +57,7 @@ export async function getFinanceViewData(searchParams?: FinanceSearchParams) {
   } else if (view === 'annual') {
     const yearMonths = monthsHistory.filter((m) => m.year === activeMonth.year);
     const allTransactions = await Promise.all(
-      yearMonths.map((month) => getTransactions(month.id)),
+      yearMonths.map((month) => getTransactions(month.id, filters)),
     );
     transactions = allTransactions.flat();
     displayMonthBalance.initialBalance =

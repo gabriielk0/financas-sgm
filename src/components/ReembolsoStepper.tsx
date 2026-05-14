@@ -1,11 +1,16 @@
 'use client';
 
-import { ChangeEvent, DragEvent, useState } from 'react';
+import { ChangeEvent, DragEvent, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, FileUp } from 'lucide-react';
+import { Check, FileUp, Loader2, Image as ImageIcon, FileText } from 'lucide-react';
 import { solicitarReembolso } from '@/app/actions/reembolsos';
 
-const equipes = ['Comando', 'Fichas', 'Pós-encontro', 'Montagem', 'Palestra'];
+const areas = [
+  'Gráfica', 'Alimentação', 'Lanche', 'Mini mercado', 'Estacionamento',
+  'Círculo', 'Sala', 'Faxina', 'Liturgia e vigília', 'Visitação',
+  'Vigília paroquial', 'Animação', 'Canto', 'Prover', 'Equipe dirigente',
+  'Comando', 'Outros'
+];
 
 const steps = ['Identificação', 'Detalhes', 'Pagamento', 'Anexo'];
 
@@ -15,14 +20,24 @@ export default function ReembolsoStepper() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     nome_pagador: '',
-    equipe: 'Comando',
+    equipe: 'Outros', // Será a Área/Equipe da despesa
     descricao: '',
     finalidade: '',
     valor: '',
     chave_pix: '',
   });
+
+  useEffect(() => {
+    if (file && file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    setPreviewUrl(null);
+  }, [file]);
 
   function updateField(
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -31,6 +46,23 @@ export default function ReembolsoStepper() {
       ...current,
       [event.target.name]: event.target.value,
     }));
+  }
+
+  function updateValor(event: ChangeEvent<HTMLInputElement>) {
+    const rawValue = event.target.value.replace(/\D/g, '');
+    if (!rawValue) {
+      setFormData((prev) => ({ ...prev, valor: '' }));
+      return;
+    }
+    const numValue = (parseInt(rawValue, 10) / 100).toFixed(2);
+    setFormData((prev) => ({ ...prev, valor: numValue }));
+  }
+
+  function formatDisplayValor(valor: string) {
+    if (!valor) return '';
+    const num = parseFloat(valor);
+    if (isNaN(num)) return '';
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
   }
 
   function handleDrop(event: DragEvent<HTMLLabelElement>) {
@@ -106,26 +138,27 @@ export default function ReembolsoStepper() {
                 name="nome_pagador"
                 value={formData.nome_pagador}
                 onChange={updateField}
-                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500"
+                placeholder="Ex: João da Silva"
+                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500 placeholder:text-zinc-600"
               />
             </label>
             <div>
-              <span className="text-sm font-medium text-zinc-300">Equipe</span>
+              <span className="text-sm font-medium text-zinc-300">Área / Equipe da Despesa</span>
               <div className="mt-3 flex flex-wrap gap-2">
-                {equipes.map((equipe) => (
+                {areas.map((area) => (
                   <button
-                    key={equipe}
+                    key={area}
                     type="button"
                     onClick={() =>
-                      setFormData((current) => ({ ...current, equipe }))
+                      setFormData((current) => ({ ...current, equipe: area }))
                     }
                     className={`rounded-full border px-3 py-2 text-sm transition ${
-                      formData.equipe === equipe
+                      formData.equipe === area
                         ? 'border-indigo-400 bg-indigo-500/20 text-indigo-100'
                         : 'border-zinc-700 bg-zinc-950 text-zinc-300 hover:border-zinc-500'
                     }`}
                   >
-                    {equipe}
+                    {area}
                   </button>
                 ))}
               </div>
@@ -144,7 +177,8 @@ export default function ReembolsoStepper() {
                 name="descricao"
                 value={formData.descricao}
                 onChange={updateField}
-                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500"
+                placeholder="Ex: Compra de materiais para decoração"
+                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500 placeholder:text-zinc-600"
               />
             </label>
             <label className="block">
@@ -156,7 +190,8 @@ export default function ReembolsoStepper() {
                 value={formData.finalidade}
                 onChange={updateField}
                 rows={6}
-                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500"
+                placeholder="Ex: Utilizado para decorar a entrada do salão principal"
+                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500 placeholder:text-zinc-600 resize-none"
               />
             </label>
           </section>
@@ -166,15 +201,14 @@ export default function ReembolsoStepper() {
           <section className="space-y-5">
             <h2 className="text-lg font-semibold text-white">Pagamento</h2>
             <label className="block">
-              <span className="text-sm font-medium text-zinc-300">Valor</span>
+              <span className="text-sm font-medium text-zinc-300">Valor (R$)</span>
               <input
                 name="valor"
-                value={formData.valor}
-                onChange={updateField}
-                type="number"
-                step="0.01"
-                min="0"
-                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500"
+                value={formatDisplayValor(formData.valor)}
+                onChange={updateValor}
+                type="tel"
+                placeholder="R$ 0,00"
+                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500 placeholder:text-zinc-600"
               />
             </label>
             <label className="block">
@@ -185,7 +219,8 @@ export default function ReembolsoStepper() {
                 name="chave_pix"
                 value={formData.chave_pix}
                 onChange={updateField}
-                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500"
+                placeholder="CPF, Celular, E-mail ou Chave Aleatória"
+                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500 placeholder:text-zinc-600"
               />
             </label>
           </section>
@@ -197,15 +232,36 @@ export default function ReembolsoStepper() {
             <label
               onDragOver={(event) => event.preventDefault()}
               onDrop={handleDrop}
-              className="flex min-h-48 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-zinc-700 bg-zinc-950 px-4 py-8 text-center transition hover:border-indigo-500"
+              className="flex min-h-48 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-zinc-700 bg-zinc-950 px-4 py-8 text-center transition hover:border-indigo-500 overflow-hidden relative group"
             >
-              <FileUp className="h-8 w-8 text-zinc-500" />
-              <span className="mt-3 text-sm font-medium text-zinc-200">
-                {file ? file.name : 'Arraste ou selecione o comprovante'}
-              </span>
-              <span className="mt-1 text-xs text-zinc-500">
-                JPG, PNG ou PDF
-              </span>
+              {previewUrl ? (
+                <div className="absolute inset-0 w-full h-full p-2">
+                  <div className="w-full h-full relative rounded-md overflow-hidden border border-zinc-800">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={previewUrl} alt="Preview" className="w-full h-full object-contain bg-zinc-900" />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="text-white text-sm font-medium px-4 py-2 bg-indigo-600 rounded-lg">Trocar imagem</span>
+                    </div>
+                  </div>
+                </div>
+              ) : file ? (
+                <div className="flex flex-col items-center justify-center">
+                  <FileText className="h-12 w-12 text-indigo-400 mb-3" />
+                  <span className="text-sm font-medium text-indigo-200">{file.name}</span>
+                  <span className="mt-2 text-xs text-zinc-500 px-3 py-1 bg-zinc-900 rounded-full group-hover:bg-indigo-600 group-hover:text-white transition">Trocar arquivo</span>
+                </div>
+              ) : (
+                <>
+                  <FileUp className="h-8 w-8 text-zinc-500" />
+                  <span className="mt-3 text-sm font-medium text-zinc-200">
+                    Arraste ou selecione o comprovante
+                  </span>
+                  <span className="mt-1 text-xs text-zinc-500">
+                    JPG, PNG ou PDF
+                  </span>
+                </>
+              )}
+              
               <input
                 type="file"
                 accept="image/jpeg,image/png,application/pdf"
@@ -221,7 +277,7 @@ export default function ReembolsoStepper() {
               <p className="font-medium text-white">Resumo</p>
               <p className="mt-2">{formData.descricao || 'Sem descrição'}</p>
               <p className="mt-1 text-zinc-500">
-                {formData.equipe} · R$ {formData.valor || '0,00'} ·{' '}
+                {formData.equipe} · {formatDisplayValor(formData.valor) || 'R$ 0,00'} ·{' '}
                 {formData.chave_pix || 'PIX não informado'}
               </p>
             </div>
@@ -258,8 +314,9 @@ export default function ReembolsoStepper() {
             type="button"
             onClick={handleSubmit}
             disabled={loading}
-            className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
           >
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             {loading ? 'Enviando...' : 'Enviar solicitação'}
           </button>
         )}
