@@ -364,17 +364,17 @@ export default function TransactionModal({
                     </div>
                     <div className="col-span-2">
                       <span className="block text-xs text-zinc-500 mb-0.5">Chave PIX</span>
-                      <span className="font-medium text-zinc-200">{transactionToEdit.reembolso.chave_pix} <span className="text-zinc-500 font-normal">({transactionToEdit.reembolso.banco})</span></span>
+                      <span className="font-medium text-zinc-200">{transactionToEdit.reembolso.chave_pix}</span>
                     </div>
                     <div>
                       <span className="block text-xs text-zinc-500 mb-0.5">Status Original</span>
                       <span className="font-medium text-amber-400">{transactionToEdit.reembolso.status}</span>
                     </div>
                   </div>
-                  {transactionToEdit.reembolso.observacoes && (
+                  {transactionToEdit.reembolso.descricao && (
                     <div className="mt-3 pt-3 border-t border-indigo-500/10">
-                      <span className="block text-xs text-zinc-500 mb-0.5">Observações do solicitante</span>
-                      <span className="text-zinc-300 italic">&quot;{transactionToEdit.reembolso.observacoes}&quot;</span>
+                      <span className="block text-xs text-zinc-500 mb-0.5">Descrição do solicitante</span>
+                      <span className="text-zinc-300 italic">&quot;{transactionToEdit.reembolso.descricao}&quot;</span>
                     </div>
                   )}
                 </div>
