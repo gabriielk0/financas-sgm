@@ -3,6 +3,8 @@ import ExportControls from '@/components/financas/ExportControls';
 import { getTeamReportData, ReportFilters } from '@/app/actions/reports';
 import { Users, TrendingUp, TrendingDown, Activity } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',

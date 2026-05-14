@@ -3,6 +3,8 @@ import ExportControls from '@/components/financas/ExportControls';
 import { getReembolsoReportData, ReportFilters } from '@/app/actions/reports';
 import { Receipt, XCircle, CheckCircle2, AlertCircle, Ban } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',

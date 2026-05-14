@@ -1,6 +1,8 @@
 import FinancasFrame from '@/components/financas/FinancasFrame';
 import RelatoriosNav from '@/components/financas/RelatoriosNav';
 
+export const dynamic = 'force-dynamic';
+
 export default function RelatoriosLayout({
   children,
 }: {
