@@ -4,6 +4,8 @@ import PrivateRoute from '@/components/PrivateRoute';
 import ReembolsoTopbar from '@/components/reembolso/ReembolsoTopbar';
 import { listarMinhasSolicitacoes } from '@/app/actions/reembolsos';
 
+export const dynamic = 'force-dynamic';
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',

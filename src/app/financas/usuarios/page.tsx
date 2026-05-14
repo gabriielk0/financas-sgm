@@ -2,6 +2,8 @@ import { listarUsuarios } from '@/app/actions/auth';
 import FinancasFrame from '@/components/financas/FinancasFrame';
 import UsuariosApprovalTable from '@/components/financas/UsuariosApprovalTable';
 
+export const dynamic = 'force-dynamic';
+
 export default async function FinancasUsuariosPage() {
   const usuarios = await listarUsuarios();
 
