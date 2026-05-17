@@ -1,22 +1,73 @@
+import { Suspense } from 'react';
 import Charts from '@/components/Charts';
 import DashboardStats from '@/components/DashboardStats';
-import FinanceHeaderControls from '@/components/financas/FinanceHeaderControls';
 import FinancasFrame from '@/components/financas/FinancasFrame';
-import { getFinanceViewData } from '../finance-data';
+import FinanceHeaderControls from '@/components/financas/FinanceHeaderControls';
+import CardsSkeleton from '@/components/skeletons/CardsSkeleton';
+import ChartSkeleton from '@/components/skeletons/ChartSkeleton';
+import { getFinanceViewData, type FinanceSearchParams } from '../finance-data';
+
+type PageSearchParams = { [key: string]: string | string[] | undefined };
+
+async function DashboardCards({
+  searchParams,
+}: {
+  searchParams?: FinanceSearchParams;
+}) {
+  const { activeMonth, displayMonthBalance, transactions } =
+    await getFinanceViewData(searchParams);
+
+  if (!activeMonth || !displayMonthBalance) {
+    return (
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-400">
+        Nao foi possivel carregar os cards do dashboard.
+      </div>
+    );
+  }
+
+  return (
+    <DashboardStats
+      monthBalance={displayMonthBalance}
+      transactions={transactions}
+    />
+  );
+}
+
+async function DashboardCharts({
+  searchParams,
+}: {
+  searchParams?: FinanceSearchParams;
+}) {
+  const { activeMonth, monthsHistory, transactions, view } =
+    await getFinanceViewData(searchParams);
+
+  if (!activeMonth) {
+    return (
+      <div className="mt-8 rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-400">
+        Nao foi possivel carregar os graficos.
+      </div>
+    );
+  }
+
+  return (
+    <Charts monthsHistory={monthsHistory} transactions={transactions} view={view} />
+  );
+}
 
 export default async function FinancasDashboardPage(props: {
-  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+  searchParams?: Promise<PageSearchParams>;
 }) {
   const searchParams = await props.searchParams;
-  const { activeMonth, displayMonthBalance, monthsHistory, transactions, view } =
-    await getFinanceViewData(searchParams);
+  const { activeMonth, monthsHistory, view } = await getFinanceViewData(
+    searchParams,
+  );
 
   return (
     <FinancasFrame>
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {!activeMonth || !displayMonthBalance ? (
+        {!activeMonth ? (
           <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-400">
-            Não foi possível carregar os dados financeiros.
+            Nao foi possivel carregar os dados financeiros.
           </div>
         ) : (
           <>
@@ -26,7 +77,7 @@ export default async function FinancasDashboardPage(props: {
                   Dashboard Financeiro
                 </h1>
                 <p className="mt-1 text-sm text-zinc-400">
-                  Visão geral de {String(activeMonth.month).padStart(2, '0')}/
+                  Visao geral de {String(activeMonth.month).padStart(2, '0')}/
                   {activeMonth.year}
                 </p>
               </div>
@@ -38,15 +89,13 @@ export default async function FinancasDashboardPage(props: {
               />
             </div>
 
-            <DashboardStats
-              monthBalance={displayMonthBalance}
-              transactions={transactions}
-            />
-            <Charts
-              monthsHistory={monthsHistory}
-              transactions={transactions}
-              view={view}
-            />
+            <Suspense fallback={<CardsSkeleton />}>
+              <DashboardCards searchParams={searchParams} />
+            </Suspense>
+
+            <Suspense fallback={<ChartSkeleton />}>
+              <DashboardCharts searchParams={searchParams} />
+            </Suspense>
           </>
         )}
       </main>
