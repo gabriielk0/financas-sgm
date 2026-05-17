@@ -1,7 +1,7 @@
 import FinanceFilters from '@/components/financas/FinanceFilters';
 import ExportControls from '@/components/financas/ExportControls';
 import { getTeamReportData, ReportFilters } from '@/app/actions/reports';
-import { Users, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { Users, TrendingUp, Activity } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +25,7 @@ export default async function EquipesReportPage(props: {
   const data = await getTeamReportData(filters);
 
   // Preparar dados para CSV
-  const csvData = data.ranking.map((r: any, index: number) => ({
+  const csvData = data.ranking.map((r, index: number) => ({
     Posicao: index + 1,
     Equipe: r.area,
     Total_Gasto: r.totalGasto,
@@ -115,7 +115,7 @@ export default async function EquipesReportPage(props: {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
-              {data.ranking.map((r: any, index: number) => (
+              {data.ranking.map((r, index: number) => (
                 <tr key={r.area} className="hover:bg-zinc-800/30 transition-colors">
                   <td className="px-6 py-4 text-zinc-500 font-medium">{index + 1}º</td>
                   <td className="px-6 py-4 font-medium text-zinc-200">{r.area}</td>

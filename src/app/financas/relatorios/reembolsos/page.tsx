@@ -1,7 +1,7 @@
 import FinanceFilters from '@/components/financas/FinanceFilters';
 import ExportControls from '@/components/financas/ExportControls';
 import { getReembolsoReportData, ReportFilters } from '@/app/actions/reports';
-import { Receipt, XCircle, CheckCircle2, AlertCircle, Ban } from 'lucide-react';
+import { Receipt, CheckCircle2, AlertCircle, Ban } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +26,7 @@ export default async function ReembolsosReportPage(props: {
   const data = await getReembolsoReportData(filters);
 
   // Preparar dados para CSV
-  const csvData = data.lista.map((r: any) => ({
+  const csvData = data.lista.map((r) => ({
     Data: new Date(r.criado_em).toLocaleString('pt-BR'),
     Solicitante: r.usuario.nome,
     Equipe: r.equipe,
@@ -107,7 +107,7 @@ export default async function ReembolsosReportPage(props: {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
-                {data.porEquipe.map((eq: any) => (
+                {data.porEquipe.map((eq) => (
                   <tr key={eq.equipe} className="hover:bg-zinc-800/30">
                     <td className="px-4 py-3 font-medium text-zinc-300">
                       {eq.equipe} <span className="text-zinc-500 font-normal text-xs ml-1">({eq.count})</span>
@@ -144,7 +144,7 @@ export default async function ReembolsosReportPage(props: {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
-                {data.lista.map((r: any) => (
+                {data.lista.map((r) => (
                   <tr key={r.id} className="hover:bg-zinc-800/30">
                     <td className="px-4 py-3 text-zinc-400 whitespace-nowrap">{new Date(r.criado_em).toLocaleDateString('pt-BR')}</td>
                     <td className="px-4 py-3 text-zinc-300">

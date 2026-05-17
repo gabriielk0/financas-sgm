@@ -1,8 +1,8 @@
 'use client';
 
-import { ChangeEvent, DragEvent, useState, useEffect } from 'react';
+import { ChangeEvent, DragEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, FileUp, Loader2, Image as ImageIcon, FileText } from 'lucide-react';
+import { Check, FileUp, Loader2, FileText } from 'lucide-react';
 import { solicitarReembolso } from '@/app/actions/reembolsos';
 
 const areas = [
@@ -30,14 +30,27 @@ export default function ReembolsoStepper() {
     chave_pix: '',
   });
 
-  useEffect(() => {
-    if (file && file.type.startsWith('image/')) {
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-      return () => URL.revokeObjectURL(url);
+  useEffect(
+    () => () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    },
+    [previewUrl],
+  );
+
+  function updateSelectedFile(nextFile: File | null) {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
     }
+
+    setFile(nextFile);
+
+    if (nextFile && nextFile.type.startsWith('image/')) {
+      setPreviewUrl(URL.createObjectURL(nextFile));
+      return;
+    }
+
     setPreviewUrl(null);
-  }, [file]);
+  }
 
   function updateField(
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -68,7 +81,7 @@ export default function ReembolsoStepper() {
   function handleDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
     const droppedFile = event.dataTransfer.files?.[0];
-    if (droppedFile) setFile(droppedFile);
+    if (droppedFile) updateSelectedFile(droppedFile);
   }
 
   async function handleSubmit() {
@@ -268,7 +281,7 @@ export default function ReembolsoStepper() {
                 className="hidden"
                 onChange={(event) => {
                   const selected = event.currentTarget.files?.[0];
-                  if (selected) setFile(selected);
+                  if (selected) updateSelectedFile(selected);
                 }}
               />
             </label>

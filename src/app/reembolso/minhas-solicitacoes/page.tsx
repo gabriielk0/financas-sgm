@@ -113,7 +113,7 @@ export default async function MinhasSolicitacoesPage() {
                     <div className="mt-6 pt-6 border-t border-zinc-800/50">
                       <h3 className="text-sm font-medium text-zinc-300 mb-4">Acompanhamento</h3>
                       <div className="space-y-4">
-                        {item.historico.map((hist: any, index: number) => (
+                        {item.historico.map((hist, index: number) => (
                           <div key={hist.id} className="flex gap-4 relative">
                             {/* Linha conectora */}
                             {index !== item.historico.length - 1 && (

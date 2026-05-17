@@ -433,7 +433,7 @@ export default function ReembolsosFinanceTable({
                     <History className="w-5 h-5 text-indigo-400" /> Histórico da Solicitação
                   </h3>
                   <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-950 p-5 shadow-inner">
-                    {selected.historico.map((hist: any, i: number) => (
+                    {selected.historico.map((hist, i: number) => (
                       <div key={hist.id} className="flex gap-4 text-sm relative">
                         {i !== selected.historico.length - 1 && (
                           <div className="absolute left-[9px] top-6 bottom-[-16px] w-px bg-zinc-800"></div>
@@ -524,14 +524,5 @@ export default function ReembolsosFinanceTable({
         </div>
       )}
     </>
-  );
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-      <p className="text-xs uppercase text-zinc-500">{label}</p>
-      <p className="mt-1 text-sm text-zinc-100">{value}</p>
-    </div>
   );
 }

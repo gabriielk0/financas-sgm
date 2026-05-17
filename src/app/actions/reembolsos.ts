@@ -1,10 +1,11 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { getCurrentMonth } from './finance';
 import { getCurrentSession } from './auth';
 import { put } from '@vercel/blob';
+import { Prisma } from '@prisma/client';
 
 async function uploadFileToStorage(usuario_id: string, file: File | null) {
   if (!file || file.size === 0) return '';
@@ -33,6 +34,7 @@ function revalidateReembolsoViews() {
   revalidatePath('/financas/reembolsos');
   revalidatePath('/financas/lancamentos');
   revalidatePath('/financas/dashboard');
+  revalidateTag('financas-transactions', 'max');
 }
 
 export async function solicitarReembolso(formData: FormData) {
@@ -93,11 +95,13 @@ export async function solicitarReembolso(formData: FormData) {
 
     revalidateReembolsoViews();
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('ERRO AO SOLICITAR REEMBOLSO:', error);
+    const message =
+      error instanceof Error ? error.message : 'Desconhecido';
     return {
       success: false,
-      error: `Erro ao solicitar o reembolso: ${error?.message || 'Desconhecido'}`,
+      error: `Erro ao solicitar o reembolso: ${message}`,
     };
   }
 }
@@ -134,7 +138,7 @@ export async function listarReembolsosFinanceiro(filtros?: {
 
     if (session?.perfil !== 'financas') return [];
 
-    const whereClause: any = {};
+    const whereClause: Prisma.ReembolsoWhereInput = {};
     if (filtros?.status) whereClause.status = filtros.status;
     if (filtros?.equipe) whereClause.equipe = filtros.equipe;
     if (filtros?.busca) {

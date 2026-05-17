@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { getCurrentSession } from '@/app/actions/auth';
+import { Prisma } from '@prisma/client';
 
 export type ReportFilters = {
   startDate?: Date;
@@ -16,7 +17,7 @@ export async function getReembolsoReportData(filters: ReportFilters) {
   const session = await getCurrentSession();
   if (session?.perfil !== 'financas') throw new Error('Acesso negado');
 
-  const whereClause: any = {};
+  const whereClause: Prisma.ReembolsoWhereInput = {};
   if (filters.startDate || filters.endDate) {
     whereClause.criado_em = {};
     if (filters.startDate) whereClause.criado_em.gte = filters.startDate;
@@ -52,7 +53,7 @@ export async function getReembolsoReportData(filters: ReportFilters) {
   const totalRejeitado = rejeitados.reduce((acc, r) => acc + r.valor, 0);
 
   // Agrupamento por Equipe
-  const porEquipe = reembolsos.reduce((acc: any, r) => {
+  const porEquipe = reembolsos.reduce<Record<string, { equipe: string; count: number; totalSolicitado: number; totalAprovado: number }>>((acc, r) => {
     if (!acc[r.equipe]) {
       acc[r.equipe] = { equipe: r.equipe, count: 0, totalSolicitado: 0, totalAprovado: 0 };
     }
@@ -64,6 +65,10 @@ export async function getReembolsoReportData(filters: ReportFilters) {
     return acc;
   }, {});
 
+  const porEquipeOrdenado = Object.values(porEquipe).sort(
+    (a, b) => b.totalSolicitado - a.totalSolicitado,
+  );
+
   return {
     kpis: {
       quantidade: reembolsos.length,
@@ -73,7 +78,7 @@ export async function getReembolsoReportData(filters: ReportFilters) {
       totalRejeitado,
       mediaValor: reembolsos.length > 0 ? totalSolicitado / reembolsos.length : 0,
     },
-    porEquipe: Object.values(porEquipe).sort((a: any, b: any) => b.totalSolicitado - a.totalSolicitado),
+    porEquipe: porEquipeOrdenado,
     lista: reembolsos,
   };
 }
@@ -83,7 +88,7 @@ export async function getTeamReportData(filters: ReportFilters) {
   const session = await getCurrentSession();
   if (session?.perfil !== 'financas') throw new Error('Acesso negado');
 
-  const whereClause: any = { type: 'OUT' };
+  const whereClause: Prisma.TransactionWhereInput = { type: 'OUT' };
   
   if (filters.startDate || filters.endDate) {
     whereClause.date = {};
@@ -98,7 +103,7 @@ export async function getTeamReportData(filters: ReportFilters) {
 
   const totalGeral = transactions.reduce((acc, t) => acc + t.amount, 0);
 
-  const porArea = transactions.reduce((acc: any, t) => {
+  const porArea = transactions.reduce<Record<string, { area: string; totalGasto: number; quantidade: number; concluido: number; pendente: number }>>((acc, t) => {
     const area = t.area || 'Outros';
     if (!acc[area]) {
       acc[area] = { area, totalGasto: 0, quantidade: 0, concluido: 0, pendente: 0 };
@@ -110,7 +115,7 @@ export async function getTeamReportData(filters: ReportFilters) {
     return acc;
   }, {});
 
-  const ranking = Object.values(porArea).map((a: any) => ({
+  const ranking = Object.values(porArea).map((a) => ({
     ...a,
     percentual: totalGeral > 0 ? (a.totalGasto / totalGeral) * 100 : 0,
   })).sort((a, b) => b.totalGasto - a.totalGasto);
@@ -127,7 +132,7 @@ export async function getConsolidatedReportData(filters: ReportFilters) {
   const session = await getCurrentSession();
   if (session?.perfil !== 'financas') throw new Error('Acesso negado');
 
-  const whereClause: any = {};
+  const whereClause: Prisma.TransactionWhereInput = {};
   if (filters.startDate || filters.endDate) {
     whereClause.date = {};
     if (filters.startDate) whereClause.date.gte = filters.startDate;

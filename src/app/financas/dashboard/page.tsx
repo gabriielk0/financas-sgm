@@ -1,8 +1,8 @@
 import { Suspense } from 'react';
-import Charts from '@/components/Charts';
 import DashboardStats from '@/components/DashboardStats';
 import FinancasFrame from '@/components/financas/FinancasFrame';
 import FinanceHeaderControls from '@/components/financas/FinanceHeaderControls';
+import LazyCharts from '@/components/financas/LazyCharts';
 import CardsSkeleton from '@/components/skeletons/CardsSkeleton';
 import ChartSkeleton from '@/components/skeletons/ChartSkeleton';
 import { getFinanceViewData, type FinanceSearchParams } from '../finance-data';
@@ -50,7 +50,11 @@ async function DashboardCharts({
   }
 
   return (
-    <Charts monthsHistory={monthsHistory} transactions={transactions} view={view} />
+    <LazyCharts
+      monthsHistory={monthsHistory}
+      transactions={transactions}
+      view={view}
+    />
   );
 }
 

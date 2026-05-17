@@ -1,10 +1,10 @@
 'use client';
 
-import { Download, FileText, Printer } from 'lucide-react';
+import { FileText, Printer } from 'lucide-react';
 import { useState } from 'react';
 
 type ExportControlsProps = {
-  dataToExport?: any[];
+  dataToExport?: Record<string, unknown>[];
   exportFileName?: string;
 };
 

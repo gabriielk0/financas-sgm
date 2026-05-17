@@ -1,9 +1,10 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { put } from '@vercel/blob';
 import { getCurrentSession } from './auth';
+import { Prisma } from '@prisma/client';
 
 async function uploadFileToStorage(path: string, file: File) {
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -20,6 +21,11 @@ async function uploadFileToStorage(path: string, file: File) {
   // Fallback local/dev quando token do Blob não estiver configurado.
   const mimeType = file.type || 'application/octet-stream';
   return `data:${mimeType};base64,${buffer.toString('base64')}`;
+}
+
+function revalidateFinanceCaches() {
+  revalidateTag('financas-months', 'max');
+  revalidateTag('financas-transactions', 'max');
 }
 
 // ==========================
@@ -118,6 +124,7 @@ export async function closeMonth(monthId: string) {
     ]);
 
     revalidatePath('/');
+    revalidateFinanceCaches();
     return { success: true };
   } catch (error: unknown) {
     console.error('ERRO AO FECHAR MÊS:', error);
@@ -188,6 +195,7 @@ export async function reopenMonth(monthId: string) {
     }
 
     revalidatePath('/');
+    revalidateFinanceCaches();
     return { success: true };
   } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
@@ -208,7 +216,7 @@ export async function getTransactions(monthId: string, filters?: {
   maxAmount?: number;
 }) {
   try {
-    const whereClause: any = { monthId };
+    const whereClause: Prisma.TransactionWhereInput = { monthId };
 
     if (filters) {
       if (filters.area) whereClause.area = filters.area;
@@ -328,6 +336,7 @@ export async function addTransaction(formData: FormData) {
     }
 
     revalidatePath('/');
+    revalidateFinanceCaches();
     return { success: true };
   } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
@@ -410,6 +419,7 @@ export async function updateTransaction(formData: FormData) {
     }
 
     revalidatePath('/');
+    revalidateFinanceCaches();
     return { success: true };
   } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
@@ -449,6 +459,7 @@ export async function completePayment(id: string) {
     }
 
     revalidatePath('/');
+    revalidateFinanceCaches();
     return { success: true };
   } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
@@ -478,6 +489,7 @@ export async function deleteTransaction(id: string) {
     });
 
     revalidatePath('/');
+    revalidateFinanceCaches();
     return { success: true };
   } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
@@ -516,6 +528,7 @@ export async function uploadMonthReport(formData: FormData) {
     });
 
     revalidatePath('/');
+    revalidateFinanceCaches();
     return { success: true, url };
   } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
@@ -568,6 +581,7 @@ export async function addTransactionAttachments(formData: FormData) {
     });
 
     revalidatePath('/');
+    revalidateFinanceCaches();
     return { success: true };
   } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
@@ -595,6 +609,7 @@ export async function deleteTransactionAttachment(attachmentId: string) {
     });
 
     revalidatePath('/');
+    revalidateFinanceCaches();
     return { success: true };
   } catch (error: unknown) {
     console.error('ERRO PRISMA:', error);
