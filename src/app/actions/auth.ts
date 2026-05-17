@@ -186,6 +186,8 @@ export async function loginAction(input: LoginInput) {
   }
 }
 
+type EquipePermitida = (typeof EQUIPES_PERMITIDAS)[number];
+
 const EQUIPES_PERMITIDAS = [
   'Comando',
   'Fichas',
@@ -206,7 +208,7 @@ export async function cadastroAction(formData: FormData) {
 
     if (perfilReq === 'financas') {
       equipe = 'Finanças';
-    } else if (!EQUIPES_PERMITIDAS.includes(equipe as any)) {
+    } else if (!EQUIPES_PERMITIDAS.includes(equipe as EquipePermitida)) {
       return { success: false, error: 'Selecione uma equipe válida.' };
     }
 
