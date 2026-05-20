@@ -12,7 +12,7 @@ export default function PublicHome() {
         </Link>
 
         <Link
-          href="/reembolso/login"
+          href="/pagamentos/login"
           className="rounded-md bg-zinc-800 px-8 py-4 text-center font-medium text-zinc-100 transition hover:bg-zinc-700 border border-zinc-700 shadow-lg"
         >
           Solicitar / Acompanhar Reembolso
@@ -21,3 +21,4 @@ export default function PublicHome() {
     </div>
   );
 }
+

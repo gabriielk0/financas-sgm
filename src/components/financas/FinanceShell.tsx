@@ -17,8 +17,8 @@ const navItems = [
     icon: ClipboardList,
   },
   {
-    href: '/financas/reembolsos',
-    label: 'Reembolsos',
+    href: '/financas/pagamentos',
+    label: 'Pagamentos',
     icon: ReceiptText,
   },
   {
@@ -82,7 +82,7 @@ export default function FinanceShell({
                 >
                   <Icon className="h-4 w-4" />
                   <span>{item.label}</span>
-                  {item.href.endsWith('/reembolsos') &&
+                  {item.href.endsWith('/pagamentos') &&
                     pendingReimbursements > 0 && (
                       <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-950">
                         {pendingReimbursements}

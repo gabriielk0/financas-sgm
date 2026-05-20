@@ -5,14 +5,14 @@ import { verifyToken } from './lib/auth';
 const publicRoutes = [
   '/',
   '/financas/login',
-  '/reembolso/login',
-  '/reembolso/cadastro',
+  '/pagamentos/login',
+  '/pagamentos/cadastro',
 ];
 
 function redirectByProfile(perfil: 'financas' | 'equipe') {
   return perfil === 'financas'
     ? '/financas/dashboard'
-    : '/reembolso/minhas-solicitacoes';
+    : '/pagamentos/minhas-solicitacoes';
 }
 
 export async function proxy(request: NextRequest) {
@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest) {
   const isPublicRoute = publicRoutes.includes(pathname);
   const isFinancasRoute = pathname === '/financas' || pathname.startsWith('/financas/');
   const isReembolsoRoute =
-    pathname === '/reembolso' || pathname.startsWith('/reembolso/');
+    pathname === '/reembolso' || pathname.startsWith('/pagamentos/');
   const isProtectedModuleRoute =
     (isFinancasRoute || isReembolsoRoute) && !isPublicRoute;
 
@@ -42,7 +42,7 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  if (payload && (pathname === '/financas/login' || pathname === '/reembolso/login')) {
+  if (payload && (pathname === '/financas/login' || pathname === '/pagamentos/login')) {
     return NextResponse.redirect(
       new URL(redirectByProfile(payload.perfil), request.url),
     );
@@ -53,7 +53,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!payload) {
-    const loginPath = isFinancasRoute ? '/financas/login' : '/reembolso/login';
+    const loginPath = isFinancasRoute ? '/financas/login' : '/pagamentos/login';
     return NextResponse.redirect(new URL(loginPath, request.url));
   }
 
@@ -71,3 +71,4 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 };
+

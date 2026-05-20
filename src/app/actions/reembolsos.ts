@@ -30,7 +30,7 @@ async function uploadFileToStorage(usuario_id: string, file: File | null) {
 }
 
 function revalidateReembolsoViews() {
-  revalidatePath('/reembolso/minhas-solicitacoes');
+  revalidatePath('/pagamentos/minhas-solicitacoes');
   revalidatePath('/financas/reembolsos');
   revalidatePath('/financas/lancamentos');
   revalidatePath('/financas/dashboard');
@@ -309,3 +309,4 @@ export async function rejeitarReembolso(reembolsoId: string, motivo: string) {
     return { success: false, error: 'Erro ao rejeitar o reembolso.' };
   }
 }
+

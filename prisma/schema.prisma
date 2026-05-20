@@ -40,6 +40,7 @@ model Transaction {
   monthBalance  MonthBalance @relation(fields: [monthId], references: [id])
   attachments   Attachment[]
   reembolso     Reembolso?
+  pagamento_orcamento PagamentoOrcamento?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -65,7 +66,9 @@ model Usuario {
   perfil     String      @default("equipe")
   criado_em       DateTime    @default(now())
   reembolsos      Reembolso[]
+  pagamentos_orcamento PagamentoOrcamento[]
   historico_acoes ReembolsoHistory[]
+  historico_pagamentos PagamentoOrcamentoHistory[]
 
   @@map("usuarios")
 }
@@ -105,4 +108,46 @@ model ReembolsoHistory {
   usuario         Usuario?  @relation(fields: [usuario_id], references: [id])
 
   @@map("reembolso_history")
+}
+
+model PagamentoOrcamento {
+  id                  String       @id @default(uuid())
+  usuario_id          String
+  descricao           String
+  finalidade          String
+  fornecedor          String
+  valor_total         Float
+  equipe              String
+  data_vencimento     DateTime
+  observacoes         String?
+  anexo_orcamento_url String
+  anexo_nf_url        String?
+  numero_nf           String?
+  data_emissao_nf     DateTime?
+  valor_aprovado      Float?
+  motivo_rejeicao     String?
+  status              String       @default("pendente_aprovacao")
+  lancamento_id       String?      @unique
+  criado_em           DateTime     @default(now())
+  atualizado_em       DateTime     @updatedAt
+
+  usuario             Usuario      @relation(fields: [usuario_id], references: [id])
+  lancamento          Transaction? @relation(fields: [lancamento_id], references: [id])
+  historico           PagamentoOrcamentoHistory[]
+
+  @@map("pagamentos_orcamento")
+}
+
+model PagamentoOrcamentoHistory {
+  id              String             @id @default(uuid())
+  pagamento_id    String
+  usuario_id      String?
+  acao            String             // "CRIADO", "APROVADO", "PAGO", "NF_ENVIADA", "CONCLUIDO"
+  descricao       String
+  criado_em       DateTime           @default(now())
+  
+  pagamento       PagamentoOrcamento @relation(fields: [pagamento_id], references: [id], onDelete: Cascade)
+  usuario         Usuario?           @relation(fields: [usuario_id], references: [id])
+
+  @@map("pagamento_orcamento_history")
 }

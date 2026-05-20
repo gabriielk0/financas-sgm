@@ -79,7 +79,7 @@ export default function MinhasSolicitacoesPage() {
             </div>
 
             <Link
-              href="/reembolso/solicitar"
+              href="/pagamentos/solicitar"
               className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-lg font-medium transition shadow-lg text-sm flex items-center gap-2"
             >
               <svg
@@ -141,3 +141,4 @@ export default function MinhasSolicitacoesPage() {
     </PrivateRoute>
   );
 }
+

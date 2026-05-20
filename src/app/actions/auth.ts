@@ -69,7 +69,7 @@ async function setSessionCookie(user: SessionUser) {
 function buildRedirect(perfil: UserProfile) {
   return perfil === 'financas'
     ? '/financas/dashboard'
-    : '/reembolso/minhas-solicitacoes';
+    : '/pagamentos/minhas-solicitacoes';
 }
 
 async function loginWithFinanceFallback(password: string) {
@@ -321,3 +321,4 @@ export async function logoutAction() {
   const cookieStore = await cookies();
   cookieStore.delete('auth_token');
 }
+

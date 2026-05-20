@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  revalidatePath('/reembolso/minhas-solicitacoes');
+  revalidatePath('/pagamentos/minhas-solicitacoes');
   revalidatePath('/financas/reembolsos');
 
   return Response.json(reembolso, { status: 201 });
@@ -64,3 +64,4 @@ export async function GET(request: NextRequest) {
 
   return Response.json(reembolsos);
 }
+

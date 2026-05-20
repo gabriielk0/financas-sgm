@@ -12,10 +12,14 @@ import {
   Eye,
   Check,
   CreditCard,
-  History
+  History,
+  ReceiptText,
+  FileText,
+  Building2
 } from 'lucide-react';
 import { aprovarReembolso, rejeitarReembolso } from '@/app/actions/reembolsos';
-import type { ReembolsoPendente } from '@/types/reembolso';
+import { aprovarPagamento, rejeitarPagamento, validarNotaFiscal } from '@/app/actions/pagamentos';
+import type { SolicitacaoFinanceiro } from '@/types/reembolso';
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', {
@@ -35,14 +39,22 @@ function whatsappUrl(whatsapp: string, nome: string, motivo: string) {
 function statusBadge(status: string) {
   const styles = {
     pendente_reembolso: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+    pendente_aprovacao: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
     aprovado: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
     rejeitado: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
+    pago: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+    nf_enviada: 'border-purple-500/30 bg-purple-500/10 text-purple-200',
+    concluido: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
   } as const;
 
   const labels = {
     pendente_reembolso: 'Pendente',
+    pendente_aprovacao: 'Pendente',
     aprovado: 'Aprovado',
     rejeitado: 'Rejeitado',
+    pago: 'Aguard. NF',
+    nf_enviada: 'NF Enviada',
+    concluido: 'Concluído',
   } as const;
 
   const key = status as keyof typeof styles;
@@ -54,13 +66,13 @@ function statusBadge(status: string) {
   );
 }
 
-export default function ReembolsosFinanceTable({
-  reembolsos,
+export default function PagamentosFinanceTable({
+  solicitacoes,
 }: {
-  reembolsos: ReembolsoPendente[];
+  solicitacoes: SolicitacaoFinanceiro[];
 }) {
   const router = useRouter();
-  const [selected, setSelected] = useState<ReembolsoPendente | null>(null);
+  const [selected, setSelected] = useState<SolicitacaoFinanceiro | null>(null);
   const [motivo, setMotivo] = useState('');
   
   // Partial approval states
@@ -76,6 +88,7 @@ export default function ReembolsosFinanceTable({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [equipeFilter, setEquipeFilter] = useState('');
+  const [tipoFilter, setTipoFilter] = useState<'todas' | 'reembolso' | 'orcamento'>('todas');
 
   function applyFilters() {
     const params = new URLSearchParams();
@@ -85,12 +98,18 @@ export default function ReembolsosFinanceTable({
     router.push(`?${params.toString()}`);
   }
 
-  async function handleApprove(reembolso: ReembolsoPendente) {
-    setLoadingAction(`approve:${reembolso.id}`);
+  async function handleApprove(solicitacao: SolicitacaoFinanceiro) {
+    setLoadingAction(`approve:${solicitacao.id}`);
     setError('');
 
     const valToApprove = typeof valorAprovado === 'number' ? valorAprovado : undefined;
-    const result = await aprovarReembolso(reembolso.id, valToApprove, justificativa);
+    
+    let result;
+    if (solicitacao.tipo === 'reembolso') {
+      result = await aprovarReembolso(solicitacao.id, valToApprove, justificativa);
+    } else {
+      result = await aprovarPagamento(solicitacao.id, valToApprove, justificativa);
+    }
 
     setLoadingAction('');
 
@@ -109,7 +128,12 @@ export default function ReembolsosFinanceTable({
     setLoadingAction(`reject:${selected.id}`);
     setError('');
 
-    const result = await rejeitarReembolso(selected.id, motivo);
+    let result;
+    if (selected.tipo === 'reembolso') {
+      result = await rejeitarReembolso(selected.id, motivo);
+    } else {
+      result = await rejeitarPagamento(selected.id, motivo);
+    }
 
     setLoadingAction('');
 
@@ -123,6 +147,11 @@ export default function ReembolsosFinanceTable({
     );
     router.refresh();
   }
+
+  const solicitacoesFiltradas = solicitacoes.filter(s => {
+    if (tipoFilter === 'todas') return true;
+    return s.tipo === tipoFilter;
+  });
 
   return (
     <>
@@ -141,17 +170,42 @@ export default function ReembolsosFinanceTable({
             />
           </div>
         </div>
+
+        <div className="flex bg-zinc-800/50 rounded-lg p-1 border border-zinc-700 h-[42px]">
+          <button
+            onClick={() => setTipoFilter('todas')}
+            className={`px-4 text-sm font-medium rounded-md transition ${tipoFilter === 'todas' ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}`}
+          >
+            Todas
+          </button>
+          <button
+            onClick={() => setTipoFilter('reembolso')}
+            className={`px-4 text-sm font-medium rounded-md transition ${tipoFilter === 'reembolso' ? 'bg-emerald-500/20 text-emerald-300 shadow-sm border border-emerald-500/30' : 'text-zinc-400 hover:text-zinc-200'}`}
+          >
+            Reembolsos
+          </button>
+          <button
+            onClick={() => setTipoFilter('orcamento')}
+            className={`px-4 text-sm font-medium rounded-md transition ${tipoFilter === 'orcamento' ? 'bg-blue-500/20 text-blue-300 shadow-sm border border-blue-500/30' : 'text-zinc-400 hover:text-zinc-200'}`}
+          >
+            Orçamentos
+          </button>
+        </div>
+
         <div className="w-full sm:w-48">
           <label className="mb-1 block text-sm font-medium text-zinc-400">Status</label>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none h-[42px]"
           >
             <option value="">Todos</option>
             <option value="pendente_reembolso">Pendentes</option>
             <option value="aprovado">Aprovados</option>
             <option value="rejeitado">Rejeitados</option>
+            <option value="pago">Aguardando NF</option>
+            <option value="nf_enviada">NF Enviada</option>
+            <option value="concluido">Concluídos</option>
           </select>
         </div>
         <div className="w-full sm:w-48">
@@ -159,7 +213,7 @@ export default function ReembolsosFinanceTable({
           <select
             value={equipeFilter}
             onChange={(e) => setEquipeFilter(e.target.value)}
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none h-[42px]"
           >
             <option value="">Todas</option>
             <option value="Comando">Comando</option>
@@ -172,7 +226,7 @@ export default function ReembolsosFinanceTable({
         </div>
         <button
           onClick={applyFilters}
-          className="rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition flex items-center gap-2"
+          className="rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition flex items-center gap-2 h-[42px]"
         >
           <Filter className="w-4 h-4" />
           Filtrar
@@ -181,9 +235,10 @@ export default function ReembolsosFinanceTable({
 
       <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px] text-left">
+          <table className="w-full min-w-[1000px] text-left">
             <thead className="bg-zinc-950 text-xs uppercase text-zinc-500">
               <tr>
+                <th className="px-4 py-3 font-medium">Tipo</th>
                 <th className="px-4 py-3 font-medium">Solicitante</th>
                 <th className="px-4 py-3 font-medium">Equipe</th>
                 <th className="px-4 py-3 font-medium">Descrição</th>
@@ -194,61 +249,72 @@ export default function ReembolsosFinanceTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
-              {reembolsos.length === 0 ? (
+              {solicitacoesFiltradas.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-4 py-10 text-center text-sm text-zinc-500"
                   >
-                    Nenhum reembolso pendente.
+                    Nenhuma solicitação encontrada.
                   </td>
                 </tr>
               ) : (
-                reembolsos.map((reembolso) => (
+                solicitacoesFiltradas.map((solicitacao) => (
                   <tr
-                    key={reembolso.id}
+                    key={solicitacao.id}
                     onClick={() => {
-                      setSelected(reembolso);
+                      setSelected(solicitacao);
                       setMotivo('');
                       setError('');
                       setWhatsAppShortcut('');
                       setIsApproving(false);
-                      setValorAprovado(reembolso.valor);
+                      setValorAprovado(solicitacao.valor);
                       setJustificativa('');
                     }}
                     className="cursor-pointer transition hover:bg-zinc-800/60"
                   >
+                    <td className="px-4 py-4 text-sm">
+                      {solicitacao.tipo === 'reembolso' ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-300">
+                          <ReceiptText className="w-3.5 h-3.5" /> Reembolso
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-300">
+                          <FileText className="w-3.5 h-3.5" /> Orçamento
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-4 text-sm text-zinc-100">
-                      {reembolso.usuario.nome}
+                      {solicitacao.usuario.nome}
                     </td>
                     <td className="px-4 py-4 text-sm text-zinc-300">
-                      {reembolso.equipe}
+                      {solicitacao.equipe}
                     </td>
                     <td className="px-4 py-4 text-sm text-zinc-300">
-                      {reembolso.descricao}
+                      {solicitacao.descricao}
                     </td>
                     <td className="px-4 py-4 text-sm font-semibold text-white">
-                      {formatCurrency(reembolso.valor)}
+                      {formatCurrency(solicitacao.valor)}
                     </td>
                     <td className="px-4 py-4">
-                      {statusBadge(reembolso.status)}
+                      {statusBadge(solicitacao.status)}
                     </td>
                     <td className="px-4 py-4 text-sm text-zinc-400">
-                      {new Date(reembolso.criado_em).toLocaleDateString(
+                      {new Date(solicitacao.criado_em).toLocaleDateString(
                         'pt-BR',
                       )}
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex justify-end gap-2">
-                        {reembolso.status === 'pendente_reembolso' ? (
+                        {solicitacao.status === 'pendente_reembolso' || solicitacao.status === 'pendente_aprovacao' ? (
                           <>
                             <button
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                setSelected(reembolso);
+                                setSelected(solicitacao);
                                 setIsApproving(true);
-                                setValorAprovado(reembolso.valor);
+                                setValorAprovado(solicitacao.valor);
                                 setJustificativa('');
                               }}
                               className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-300 transition hover:bg-emerald-500 hover:text-white"
@@ -260,7 +326,7 @@ export default function ReembolsosFinanceTable({
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                setSelected(reembolso);
+                                setSelected(solicitacao);
                                 setIsApproving(false);
                               }}
                               className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-rose-500/10 text-rose-300 transition hover:bg-rose-500 hover:text-white"
@@ -270,13 +336,28 @@ export default function ReembolsosFinanceTable({
                             </button>
                           </>
                         ) : (
-                          <button
-                            type="button"
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-300 transition hover:bg-indigo-500 hover:text-white"
-                            title="Ver Detalhes"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            {solicitacao.tipo === 'orcamento' && (solicitacao.status === 'nf_enviada' || solicitacao.status === 'concluido') && solicitacao.anexo_nf_url && (
+                              <a
+                                href={solicitacao.anexo_nf_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 text-xs font-semibold text-purple-300 transition hover:bg-purple-500 hover:text-white"
+                                title="Visualizar Nota Fiscal"
+                              >
+                                <FileText className="h-3.5 w-3.5" />
+                                <span className="hidden sm:inline">Ver NF</span>
+                              </a>
+                            )}
+                            <button
+                              type="button"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-300 transition hover:bg-indigo-500 hover:text-white"
+                              title="Ver Detalhes"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </td>
@@ -321,7 +402,7 @@ export default function ReembolsosFinanceTable({
                     <div>
                       <strong className="block text-sm text-zinc-500 mb-1">Valor Solicitado</strong>
                       <span className="text-2xl font-semibold text-white">{formatCurrency(selected.valor)}</span>
-                      {selected.valor_aprovado !== null && selected.valor_aprovado !== selected.valor && (
+                      {selected.valor_aprovado !== null && selected.valor_aprovado !== undefined && selected.valor_aprovado !== selected.valor && (
                         <p className="text-sm font-medium text-amber-400 mt-1 bg-amber-400/10 inline-block px-2 py-0.5 rounded">
                           Aprovado: {formatCurrency(selected.valor_aprovado)}
                         </p>
@@ -329,10 +410,21 @@ export default function ReembolsosFinanceTable({
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <strong className="block text-sm text-zinc-500 mb-1">Chave PIX</strong>
-                        <span className="text-base text-zinc-300 break-all">{selected.chave_pix}</span>
-                      </div>
+                      {selected.tipo === 'reembolso' ? (
+                        <div>
+                          <strong className="block text-sm text-zinc-500 mb-1">Chave PIX</strong>
+                          <span className="text-base text-zinc-300 break-all">{selected.chave_pix}</span>
+                        </div>
+                      ) : (
+                        <div>
+                          <strong className="block text-sm text-zinc-500 mb-1">Fornecedor</strong>
+                          <span className="text-base text-zinc-300 break-all flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-zinc-500" />
+                            {selected.fornecedor}
+                          </span>
+                        </div>
+                      )}
+                      
                       <div>
                         <strong className="block text-sm text-zinc-500 mb-1">Data do Pedido</strong>
                         <span className="text-base text-zinc-300">{new Date(selected.criado_em).toLocaleString('pt-BR')}</span>
@@ -354,7 +446,9 @@ export default function ReembolsosFinanceTable({
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-medium text-white mb-3">Comprovante Anexo</h3>
+                  <h3 className="text-lg font-medium text-white mb-3">
+                    {selected.tipo === 'reembolso' ? 'Comprovante Anexo' : 'Orçamento Anexo'}
+                  </h3>
                   <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 shadow-inner">
                     {selected.anexo_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) || !selected.anexo_url.includes('.pdf') ? (
                       <a href={selected.anexo_url} target="_blank" rel="noopener noreferrer" className="block w-full overflow-hidden rounded-lg border border-zinc-800 relative group">
@@ -383,7 +477,7 @@ export default function ReembolsosFinanceTable({
               <div className="space-y-6 flex flex-col">
               {isApproving ? (
                 <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 mb-4">
-                  <h3 className="text-sm font-medium text-emerald-400 mb-3">Aprovação de Reembolso</h3>
+                  <h3 className="text-sm font-medium text-emerald-400 mb-3">Aprovação de {selected.tipo === 'reembolso' ? 'Reembolso' : 'Pagamento'}</h3>
                   <div className="grid sm:grid-cols-2 gap-4">
                     <label className="block">
                       <span className="text-sm font-medium text-zinc-300 mb-1 block">Valor Aprovado (R$)</span>
@@ -410,7 +504,7 @@ export default function ReembolsosFinanceTable({
                     <p className="mt-2 text-xs text-amber-400">A justificativa é necessária ao aprovar valor diferente do solicitado.</p>
                   )}
                 </div>
-              ) : selected.status === 'pendente_reembolso' ? (
+              ) : selected.status === 'pendente_reembolso' || selected.status === 'pendente_aprovacao' ? (
                 <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 mb-4">
                   <label className="block">
                     <span className="text-sm font-medium text-zinc-300">
@@ -423,6 +517,47 @@ export default function ReembolsosFinanceTable({
                       className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-rose-500"
                     />
                   </label>
+                </div>
+              ) : selected.status === 'nf_enviada' && selected.tipo === 'orcamento' ? (
+                <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-5 mb-4">
+                  <h3 className="text-sm font-medium text-purple-400 mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> Validação da Nota Fiscal
+                  </h3>
+                  <p className="text-sm text-zinc-300 mb-4">
+                    O solicitante anexou a Nota Fiscal (Nº {selected.numero_nf || 'Não informado'}). Por favor, visualize o arquivo e valide-o para finalizar este fluxo.
+                  </p>
+                  
+                  {selected.anexo_nf_url && (
+                    <a
+                      href={selected.anexo_nf_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-4 py-2 text-sm font-semibold text-purple-300 transition hover:bg-purple-500 hover:text-white"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Visualizar Nota Fiscal
+                    </a>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setLoadingAction(`validate_nf:${selected.id}`);
+                      setError('');
+                      const res = await validarNotaFiscal(selected.id);
+                      setLoadingAction('');
+                      if (!res.success) setError(res.error || 'Erro ao validar NF.');
+                      else {
+                        setSelected(null);
+                        router.refresh();
+                      }
+                    }}
+                    disabled={loadingAction === `validate_nf:${selected.id}`}
+                    className="w-full rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50 shadow-md flex justify-center items-center gap-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    {loadingAction === `validate_nf:${selected.id}` ? 'Validando...' : 'Finalizar / Validar NF'}
+                  </button>
                 </div>
               ) : null}
 
@@ -485,7 +620,7 @@ export default function ReembolsosFinanceTable({
                 </button>
               )}
               
-              {selected.status === 'pendente_reembolso' && (
+              {(selected.status === 'pendente_reembolso' || selected.status === 'pendente_aprovacao') && (
                 <>
                   <button
                     type="button"

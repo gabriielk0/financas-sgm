@@ -98,7 +98,7 @@ export default function ReembolsoStepper() {
     setLoading(false);
 
     if (result.success) {
-      router.push('/reembolso/minhas-solicitacoes');
+      router.push('/pagamentos/minhas-solicitacoes');
       router.refresh();
       return;
     }
@@ -337,3 +337,4 @@ export default function ReembolsoStepper() {
     </div>
   );
 }
+

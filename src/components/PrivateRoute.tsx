@@ -41,7 +41,7 @@ export default function PrivateRoute({ children, modulo }: PrivateRouteProps) {
       | null;
 
     const loginRoute =
-      modulo === 'financas' ? '/financas/login' : '/reembolso/login';
+      modulo === 'financas' ? '/financas/login' : '/pagamentos/login';
 
     if (!token) {
       router.replace(loginRoute);
@@ -86,3 +86,4 @@ export default function PrivateRoute({ children, modulo }: PrivateRouteProps) {
 
   return <>{children}</>;
 }
+

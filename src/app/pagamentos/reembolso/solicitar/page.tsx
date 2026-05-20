@@ -1,6 +1,6 @@
 import PrivateRoute from '@/components/PrivateRoute';
 import ReembolsoStepper from '@/components/ReembolsoStepper';
-import ReembolsoTopbar from '@/components/reembolso/ReembolsoTopbar';
+import ReembolsoTopbar from '@/components/pagamentos/ReembolsoTopbar';
 
 export default function SolicitarReembolsoPage() {
   return (
@@ -22,3 +22,4 @@ export default function SolicitarReembolsoPage() {
     </PrivateRoute>
   );
 }
+

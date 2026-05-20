@@ -448,12 +448,34 @@ export async function completePayment(id: string) {
 
     if (transaction.referenceType === 'reembolso' && transaction.referenceId) {
       const session = await getCurrentSession();
+      
+      await prisma.reembolso.update({
+        where: { id: transaction.referenceId },
+        data: { status: 'concluido' }
+      });
+
       await prisma.reembolsoHistory.create({
         data: {
           reembolso_id: transaction.referenceId,
           usuario_id: session?.usuarioId,
           acao: 'PAGO',
           descricao: 'Lançamento financeiro marcado como pago / concluído.',
+        }
+      });
+    } else if (transaction.referenceType === 'pagamento' && transaction.referenceId) {
+      const session = await getCurrentSession();
+
+      await prisma.pagamentoOrcamento.update({
+        where: { id: transaction.referenceId },
+        data: { status: 'pago' }
+      });
+
+      await prisma.pagamentoOrcamentoHistory.create({
+        data: {
+          pagamento_id: transaction.referenceId,
+          usuario_id: session?.usuarioId,
+          acao: 'PAGO',
+          descricao: 'Lançamento financeiro marcado como pago. Aguardando envio da Nota Fiscal.',
         }
       });
     }

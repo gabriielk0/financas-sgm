@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
 export default function ReembolsoIndexPage() {
-  redirect('/reembolso/minhas-solicitacoes');
+  redirect('/pagamentos/minhas-solicitacoes');
 }
+

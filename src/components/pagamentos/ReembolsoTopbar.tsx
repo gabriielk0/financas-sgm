@@ -6,8 +6,8 @@ import { LogOut, Plus, ReceiptText } from 'lucide-react';
 import { logoutAction } from '@/app/actions/auth';
 
 const navItems = [
-  { href: '/reembolso/minhas-solicitacoes', label: 'Minhas Solicitações' },
-  { href: '/reembolso/solicitar', label: 'Nova Solicitação' },
+  { href: '/pagamentos/minhas-solicitacoes', label: 'Minhas Solicitações' },
+  { href: '/pagamentos/solicitar', label: 'Nova Solicitação' },
 ];
 
 export default function ReembolsoTopbar() {
@@ -19,14 +19,14 @@ export default function ReembolsoTopbar() {
     localStorage.removeItem('token');
     localStorage.removeItem('perfil');
     localStorage.removeItem('usuario');
-    router.replace('/reembolso/login');
+    router.replace('/pagamentos/login');
     router.refresh();
   }
 
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
-        <Link href="/reembolso/minhas-solicitacoes" className="flex items-center gap-2">
+        <Link href="/pagamentos/minhas-solicitacoes" className="flex items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
             <ReceiptText className="h-5 w-5" />
           </span>
@@ -70,3 +70,4 @@ export default function ReembolsoTopbar() {
     </header>
   );
 }
+

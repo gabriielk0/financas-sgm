@@ -42,7 +42,7 @@ export default function CadastroReembolsoForm() {
     <main className="min-h-screen bg-zinc-950 px-4 py-8 flex items-center justify-center">
       <div className="w-full max-w-2xl border border-zinc-800 bg-zinc-900 p-6 sm:p-8 rounded-lg shadow-xl">
         <Link
-          href="/reembolso/login"
+          href="/pagamentos/login"
           className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -153,3 +153,4 @@ export default function CadastroReembolsoForm() {
     </main>
   );
 }
+
