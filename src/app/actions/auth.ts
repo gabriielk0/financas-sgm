@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { AuthPayload, UserProfile, signToken, verifyToken } from '@/lib/auth';
+import { loginSchema, cadastroSchema } from '@/lib/validations';
 
 type LoginInput =
   | string
@@ -114,6 +115,11 @@ export async function loginAction(input: LoginInput) {
         ? { password: input, modulo: 'financas' as UserProfile }
         : input;
 
+    const validation = loginSchema.safeParse(payload);
+    if (!validation.success) {
+      return { success: false, error: validation.error.issues[0].message };
+    }
+
     const email = payload.email ? normalizeEmail(payload.email) : '';
     const password = payload.password;
 
@@ -208,16 +214,21 @@ export async function cadastroAction(formData: FormData) {
 
     if (perfilReq === 'financas') {
       equipe = 'Finanças';
-    } else if (!EQUIPES_PERMITIDAS.includes(equipe as EquipePermitida)) {
-      return { success: false, error: 'Selecione uma equipe válida.' };
     }
 
-    if (!nome || !equipe || !email || !whatsapp || !senha) {
-      return { success: false, error: 'Preencha todos os campos.' };
-    }
+    const rawData = {
+      nome,
+      equipe: perfilReq === 'equipe' ? equipe : undefined,
+      email,
+      whatsapp,
+      senha,
+      confirmarSenha,
+      perfil: perfilReq as 'financas' | 'equipe',
+    };
 
-    if (senha !== confirmarSenha) {
-      return { success: false, error: 'As senhas não conferem.' };
+    const validation = cadastroSchema.safeParse(rawData);
+    if (!validation.success) {
+      return { success: false, error: validation.error.issues[0].message };
     }
 
     const existing = await prisma.usuario.findUnique({

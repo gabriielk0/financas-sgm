@@ -4,6 +4,8 @@ import { ChangeEvent, DragEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, FileUp, Loader2, FileText } from 'lucide-react';
 import { solicitarReembolso } from '@/app/actions/reembolsos';
+import { reembolsoSchema } from '@/lib/validations';
+import { z } from 'zod';
 
 const areas = [
   'Gráfica', 'Alimentação', 'Lanche', 'Mini mercado', 'Estacionamento',
@@ -19,6 +21,7 @@ export default function ReembolsoStepper() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -84,9 +87,89 @@ export default function ReembolsoStepper() {
     if (droppedFile) updateSelectedFile(droppedFile);
   }
 
-  async function handleSubmit() {
-    setLoading(true);
+  function validateStep(currentStep: number): boolean {
+    setFieldErrors({});
     setError('');
+
+    if (currentStep === 0) {
+      const stepSchema = z.object({
+        nome_pagador: reembolsoSchema.shape.nome_pagador,
+        equipe: reembolsoSchema.shape.equipe,
+      });
+      const res = stepSchema.safeParse({
+        nome_pagador: formData.nome_pagador,
+        equipe: formData.equipe,
+      });
+      if (!res.success) {
+        const errors: Record<string, string> = {};
+        res.error.issues.forEach((err) => {
+          if (err.path[0]) errors[err.path[0] as string] = err.message;
+        });
+        setFieldErrors(errors);
+        return false;
+      }
+    } else if (currentStep === 1) {
+      const stepSchema = z.object({
+        descricao: reembolsoSchema.shape.descricao,
+        finalidade: reembolsoSchema.shape.finalidade,
+      });
+      const res = stepSchema.safeParse({
+        descricao: formData.descricao,
+        finalidade: formData.finalidade,
+      });
+      if (!res.success) {
+        const errors: Record<string, string> = {};
+        res.error.issues.forEach((err) => {
+          if (err.path[0]) errors[err.path[0] as string] = err.message;
+        });
+        setFieldErrors(errors);
+        return false;
+      }
+    } else if (currentStep === 2) {
+      const stepSchema = z.object({
+        valor: reembolsoSchema.shape.valor,
+        chave_pix: reembolsoSchema.shape.chave_pix,
+      });
+      const res = stepSchema.safeParse({
+        valor: formData.valor,
+        chave_pix: formData.chave_pix,
+      });
+      if (!res.success) {
+        const errors: Record<string, string> = {};
+        res.error.issues.forEach((err) => {
+          if (err.path[0]) errors[err.path[0] as string] = err.message;
+        });
+        setFieldErrors(errors);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  async function handleSubmit() {
+    setError('');
+    setFieldErrors({});
+
+    const validation = reembolsoSchema.safeParse({
+      nome_pagador: formData.nome_pagador,
+      equipe: formData.equipe,
+      descricao: formData.descricao,
+      finalidade: formData.finalidade,
+      valor: formData.valor,
+      chave_pix: formData.chave_pix,
+    });
+
+    if (!validation.success) {
+      setError('Por favor, corrija os erros nos passos anteriores.');
+      const errors: Record<string, string> = {};
+      validation.error.issues.forEach((err) => {
+        if (err.path[0]) errors[err.path[0] as string] = err.message;
+      });
+      setFieldErrors(errors);
+      return;
+    }
+
+    setLoading(true);
 
     const payload = new FormData();
     Object.entries(formData).forEach(([key, value]) => {
@@ -117,7 +200,20 @@ export default function ReembolsoStepper() {
             <button
               key={label}
               type="button"
-              onClick={() => setStep(index)}
+              onClick={() => {
+                if (index < step) {
+                  setStep(index);
+                } else if (index > step) {
+                  let valid = true;
+                  for (let s = step; s < index; s++) {
+                    if (!validateStep(s)) {
+                      valid = false;
+                      break;
+                    }
+                  }
+                  if (valid) setStep(index);
+                }
+              }}
               className="min-w-0 text-left"
             >
               <span
@@ -154,6 +250,9 @@ export default function ReembolsoStepper() {
                 placeholder="Ex: João da Silva"
                 className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500 placeholder:text-zinc-600"
               />
+              {fieldErrors.nome_pagador && (
+                <p className="text-xs text-rose-500 mt-1">{fieldErrors.nome_pagador}</p>
+              )}
             </label>
             <div>
               <span className="text-sm font-medium text-zinc-300">Área / Equipe da Despesa</span>
@@ -175,6 +274,9 @@ export default function ReembolsoStepper() {
                   </button>
                 ))}
               </div>
+              {fieldErrors.equipe && (
+                <p className="text-xs text-rose-500 mt-1">{fieldErrors.equipe}</p>
+              )}
             </div>
           </section>
         )}
@@ -193,6 +295,9 @@ export default function ReembolsoStepper() {
                 placeholder="Ex: Compra de materiais para decoração"
                 className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500 placeholder:text-zinc-600"
               />
+              {fieldErrors.descricao && (
+                <p className="text-xs text-rose-500 mt-1">{fieldErrors.descricao}</p>
+              )}
             </label>
             <label className="block">
               <span className="text-sm font-medium text-zinc-300">
@@ -206,6 +311,9 @@ export default function ReembolsoStepper() {
                 placeholder="Ex: Utilizado para decorar a entrada do salão principal"
                 className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500 placeholder:text-zinc-600 resize-none"
               />
+              {fieldErrors.finalidade && (
+                <p className="text-xs text-rose-500 mt-1">{fieldErrors.finalidade}</p>
+              )}
             </label>
           </section>
         )}
@@ -223,6 +331,9 @@ export default function ReembolsoStepper() {
                 placeholder="R$ 0,00"
                 className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500 placeholder:text-zinc-600"
               />
+              {fieldErrors.valor && (
+                <p className="text-xs text-rose-500 mt-1">{fieldErrors.valor}</p>
+              )}
             </label>
             <label className="block">
               <span className="text-sm font-medium text-zinc-300">
@@ -235,6 +346,9 @@ export default function ReembolsoStepper() {
                 placeholder="CPF, Celular, E-mail ou Chave Aleatória"
                 className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 text-sm text-white outline-none focus:border-indigo-500 placeholder:text-zinc-600"
               />
+              {fieldErrors.chave_pix && (
+                <p className="text-xs text-rose-500 mt-1">{fieldErrors.chave_pix}</p>
+              )}
             </label>
           </section>
         )}
@@ -317,7 +431,11 @@ export default function ReembolsoStepper() {
         {step < steps.length - 1 ? (
           <button
             type="button"
-            onClick={() => setStep((current) => Math.min(3, current + 1))}
+            onClick={() => {
+              if (validateStep(step)) {
+                setStep((current) => Math.min(3, current + 1));
+              }
+            }}
             className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
           >
             Próximo

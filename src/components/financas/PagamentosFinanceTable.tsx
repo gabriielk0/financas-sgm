@@ -153,6 +153,17 @@ export default function PagamentosFinanceTable({
     return s.tipo === tipoFilter;
   });
 
+  const paymentDetails = (() => {
+    if (selected && selected.tipo === 'orcamento' && selected.observacoes) {
+      try {
+        return JSON.parse(selected.observacoes);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  })();
+
   return (
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end">
@@ -444,6 +455,114 @@ export default function PagamentosFinanceTable({
                       </div>
                     </div>
                   </div>
+
+                  {selected.tipo === 'orcamento' && (
+                    <div>
+                      <h3 className="text-lg font-medium text-white mb-3">Forma de Pagamento</h3>
+                      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5 space-y-4 shadow-inner">
+                        {paymentDetails && paymentDetails.metodo_pagamento ? (
+                          <>
+                            <div>
+                              <strong className="block text-sm text-zinc-500 mb-1">Método Escolhido</strong>
+                              <span className="inline-flex rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-1 text-xs font-semibold text-indigo-300 uppercase">
+                                {paymentDetails.metodo_pagamento === 'pix' ? 'PIX' :
+                                 paymentDetails.metodo_pagamento === 'transferencia' ? 'Transferência / Depósito' :
+                                 paymentDetails.metodo_pagamento === 'boleto' ? 'Boleto' : paymentDetails.metodo_pagamento}
+                              </span>
+                            </div>
+
+                             {paymentDetails.metodo_pagamento === 'pix' && (
+                              <div className="space-y-3">
+                                <div>
+                                  <strong className="block text-sm text-zinc-500 mb-1">Chave PIX</strong>
+                                  <span className="text-base text-white font-mono break-all bg-zinc-900 rounded-lg p-2.5 border border-zinc-800/60 block select-all">
+                                    {paymentDetails.chave_pix}
+                                  </span>
+                                </div>
+                                {(paymentDetails.pix_nome || paymentDetails.pix_banco) && (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/60">
+                                    {paymentDetails.pix_nome && (
+                                      <div>
+                                        <strong className="block text-xs text-zinc-500 mb-0.5">Nome do Titular</strong>
+                                        <span className="text-sm font-semibold text-white break-words">{paymentDetails.pix_nome}</span>
+                                      </div>
+                                    )}
+                                    {paymentDetails.pix_banco && (
+                                      <div>
+                                        <strong className="block text-xs text-zinc-500 mb-0.5">Banco / Instituição</strong>
+                                        <span className="text-sm font-semibold text-white break-words">{paymentDetails.pix_banco}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {paymentDetails.metodo_pagamento === 'transferencia' && (
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div className="min-w-0">
+                                  <strong className="block text-sm text-zinc-500 mb-0.5">Banco</strong>
+                                  <span className="text-sm font-semibold text-white break-words">{paymentDetails.banco}</span>
+                                </div>
+                                <div className="min-w-0">
+                                  <strong className="block text-sm text-zinc-500 mb-0.5">Agência</strong>
+                                  <span className="text-sm font-semibold text-white break-words">{paymentDetails.agencia}</span>
+                                </div>
+                                <div className="min-w-0">
+                                  <strong className="block text-sm text-zinc-500 mb-0.5">Conta</strong>
+                                  <span className="text-sm font-semibold text-white break-words">{paymentDetails.conta}</span>
+                                </div>
+                                {paymentDetails.cpf_cnpj && (
+                                  <div className="sm:col-span-3 min-w-0">
+                                    <strong className="block text-sm text-zinc-500 mb-0.5">CPF/CNPJ do Titular</strong>
+                                    <span className="text-sm font-semibold text-white break-words">{paymentDetails.cpf_cnpj}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {paymentDetails.metodo_pagamento === 'boleto' && (
+                              <div className="space-y-3">
+                                {paymentDetails.codigo_barras && (
+                                  <div>
+                                    <strong className="block text-sm text-zinc-500 mb-1">Código de Barras</strong>
+                                    <span className="text-xs text-white font-mono break-all bg-zinc-900 rounded-lg p-2.5 border border-zinc-800/60 block select-all">
+                                      {paymentDetails.codigo_barras}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-3 text-xs text-blue-200 leading-relaxed">
+                                  Você selecionou Boleto. O documento está anexado na seção &quot;Orçamento Anexo&quot; abaixo para visualização e download.
+                                </div>
+                              </div>
+                            )}
+
+                            {paymentDetails.observacoes_adicionais && (
+                              <div>
+                                <strong className="block text-sm text-zinc-500 mb-1">Observações Adicionais</strong>
+                                <span className="text-sm text-zinc-300 block bg-zinc-900 rounded-lg p-3 border border-zinc-800/60 leading-relaxed font-sans">
+                                  {paymentDetails.observacoes_adicionais}
+                                </span>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {selected.observacoes ? (
+                              <div>
+                                <strong className="block text-sm text-zinc-500 mb-1">Observações / Dados Bancários</strong>
+                                <span className="text-sm text-zinc-300 block bg-zinc-900 rounded-lg p-3 border border-zinc-800/60 leading-relaxed font-sans">
+                                  {selected.observacoes}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-zinc-500 text-sm">Nenhum dado de pagamento ou observação informado.</span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <h3 className="text-lg font-medium text-white mb-3">

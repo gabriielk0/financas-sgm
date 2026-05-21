@@ -7,7 +7,6 @@ import { logoutAction } from '@/app/actions/auth';
 
 const navItems = [
   { href: '/pagamentos/minhas-solicitacoes', label: 'Minhas Solicitações' },
-  { href: '/pagamentos/solicitar', label: 'Nova Solicitação' },
 ];
 
 export default function ReembolsoTopbar() {

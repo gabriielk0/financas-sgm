@@ -6,6 +6,7 @@ import { getCurrentSession } from './auth';
 import { getCurrentMonth } from './finance';
 import { put } from '@vercel/blob';
 import { Prisma } from '@prisma/client';
+import { pagamentoSchema } from '@/lib/validations';
 
 async function uploadFileToStorage(usuario_id: string, file: File | null, folder: string = 'orcamentos') {
   if (!file || file.size === 0) return '';
@@ -50,23 +51,57 @@ export async function solicitarPagamento(formData: FormData) {
     const equipe = String(formData.get('equipe') || '').trim();
     const valor_total = Number.parseFloat(String(formData.get('valor_total') || '0'));
     const data_vencimento = String(formData.get('data_vencimento') || '').trim();
-    const observacoes = String(formData.get('observacoes') || '').trim();
     const file = formData.get('file') as File | null;
 
-    if (
-      !descricao ||
-      !finalidade ||
-      !fornecedor ||
-      !equipe ||
-      !data_vencimento ||
-      Number.isNaN(valor_total) ||
-      valor_total <= 0
-    ) {
-      return {
-        success: false,
-        error: 'Preencha todos os dados obrigatórios do pagamento.',
-      };
+    // Novos campos de Forma de Pagamento
+    const metodo_pagamento = String(formData.get('metodo_pagamento') || '').trim();
+    const chave_pix = String(formData.get('chave_pix') || '').trim();
+    const pix_nome = String(formData.get('pix_nome') || '').trim();
+    const pix_banco = String(formData.get('pix_banco') || '').trim();
+    const banco = String(formData.get('banco') || '').trim();
+    const agencia = String(formData.get('agencia') || '').trim();
+    const conta = String(formData.get('conta') || '').trim();
+    const cpf_cnpj = String(formData.get('cpf_cnpj') || '').trim();
+    const codigo_barras = String(formData.get('codigo_barras') || '').trim();
+    const observacoesInput = String(formData.get('observacoes') || '').trim();
+
+    const rawData = {
+      descricao,
+      finalidade,
+      fornecedor,
+      equipe,
+      valor_total,
+      data_vencimento,
+      metodo_pagamento: metodo_pagamento as 'pix' | 'transferencia' | 'boleto',
+      chave_pix: metodo_pagamento === 'pix' ? chave_pix : undefined,
+      pix_nome: metodo_pagamento === 'pix' ? pix_nome : undefined,
+      pix_banco: metodo_pagamento === 'pix' ? pix_banco : undefined,
+      banco: metodo_pagamento === 'transferencia' ? banco : undefined,
+      agencia: metodo_pagamento === 'transferencia' ? agencia : undefined,
+      conta: metodo_pagamento === 'transferencia' ? conta : undefined,
+      cpf_cnpj: metodo_pagamento === 'transferencia' ? cpf_cnpj : undefined,
+      codigo_barras: metodo_pagamento === 'boleto' ? codigo_barras : undefined,
+      observacoes: observacoesInput || undefined,
+    };
+
+    const validation = pagamentoSchema.safeParse(rawData);
+    if (!validation.success) {
+      return { success: false, error: validation.error.issues[0].message };
     }
+
+    // Serializa como JSON no campo observacoes
+    const observacoes = JSON.stringify({
+      metodo_pagamento,
+      chave_pix: metodo_pagamento === 'pix' ? chave_pix : '',
+      pix_nome: metodo_pagamento === 'pix' ? pix_nome : '',
+      pix_banco: metodo_pagamento === 'pix' ? pix_banco : '',
+      banco: metodo_pagamento === 'transferencia' ? banco : '',
+      agencia: metodo_pagamento === 'transferencia' ? agencia : '',
+      conta: metodo_pagamento === 'transferencia' ? conta : '',
+      cpf_cnpj: metodo_pagamento === 'transferencia' ? cpf_cnpj : '',
+      codigo_barras: metodo_pagamento === 'boleto' ? codigo_barras : '',
+      observacoes_adicionais: observacoesInput,
+    });
 
     if (!file || file.size === 0) {
       return {

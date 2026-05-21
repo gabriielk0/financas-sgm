@@ -6,6 +6,7 @@ import { getCurrentMonth } from './finance';
 import { getCurrentSession } from './auth';
 import { put } from '@vercel/blob';
 import { Prisma } from '@prisma/client';
+import { reembolsoSchema } from '@/lib/validations';
 
 async function uploadFileToStorage(usuario_id: string, file: File | null) {
   if (!file || file.size === 0) return '';
@@ -53,19 +54,18 @@ export async function solicitarReembolso(formData: FormData) {
     const chave_pix = String(formData.get('chave_pix') || '').trim();
     const file = formData.get('file') as File | null;
 
-    if (
-      !nome_pagador ||
-      !equipe ||
-      !descricao ||
-      !finalidade ||
-      !chave_pix ||
-      Number.isNaN(valor) ||
-      valor <= 0
-    ) {
-      return {
-        success: false,
-        error: 'Preencha todos os dados do reembolso.',
-      };
+    const rawData = {
+      nome_pagador,
+      equipe,
+      descricao,
+      finalidade,
+      valor,
+      chave_pix,
+    };
+
+    const validation = reembolsoSchema.safeParse(rawData);
+    if (!validation.success) {
+      return { success: false, error: validation.error.issues[0].message };
     }
 
     const anexo_url = await uploadFileToStorage(session.usuarioId, file);

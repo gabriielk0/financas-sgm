@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { UploadCloud, CheckCircle2 } from 'lucide-react';
+import { UploadCloud, CheckCircle2, QrCode, Building2, FileText, Loader2 } from 'lucide-react';
 import { solicitarPagamento } from '@/app/actions/pagamentos';
+import { pagamentoSchema } from '@/lib/validations';
 
 const EQUIPES = [
   'Gráfica', 'Alimentação', 'Lanche', 'Mini mercado', 'Estacionamento',
@@ -16,18 +17,53 @@ export default function CadastroPagamentoForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [metodoPagamento, setMetodoPagamento] = useState<'pix' | 'transferencia' | 'boleto' | ''>('');
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
     setLoading(true);
 
     try {
       const formData = new FormData(e.currentTarget);
       if (file) {
         formData.append('file', file);
+      }
+
+      const rawData = {
+        descricao: formData.get('descricao') as string,
+        fornecedor: formData.get('fornecedor') as string,
+        valor_total: formData.get('valor_total') as string,
+        data_vencimento: formData.get('data_vencimento') as string,
+        equipe: formData.get('equipe') as string,
+        finalidade: formData.get('finalidade') as string,
+        metodo_pagamento: formData.get('metodo_pagamento') as string,
+        chave_pix: formData.get('chave_pix') as string || undefined,
+        pix_nome: formData.get('pix_nome') as string || undefined,
+        pix_banco: formData.get('pix_banco') as string || undefined,
+        banco: formData.get('banco') as string || undefined,
+        agencia: formData.get('agencia') as string || undefined,
+        conta: formData.get('conta') as string || undefined,
+        cpf_cnpj: formData.get('cpf_cnpj') as string || undefined,
+        codigo_barras: formData.get('codigo_barras') as string || undefined,
+        observacoes: formData.get('observacoes') as string || undefined,
+      };
+
+      const validation = pagamentoSchema.safeParse(rawData);
+      if (!validation.success) {
+        const errors: Record<string, string> = {};
+        validation.error.issues.forEach((err) => {
+          if (err.path[0]) {
+            errors[err.path[0] as string] = err.message;
+          }
+        });
+        setFieldErrors(errors);
+        setLoading(false);
+        return;
       }
 
       const res = await solicitarPagamento(formData);
@@ -80,10 +116,12 @@ export default function CadastroPagamentoForm() {
           <input
             id="descricao"
             name="descricao"
-            required
             placeholder="Ex: Assinatura do Software X"
             className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
+          {fieldErrors.descricao && (
+            <p className="text-xs text-rose-500 mt-1">{fieldErrors.descricao}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -93,10 +131,12 @@ export default function CadastroPagamentoForm() {
           <input
             id="fornecedor"
             name="fornecedor"
-            required
             placeholder="Nome da empresa ou prestador"
             className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
+          {fieldErrors.fornecedor && (
+            <p className="text-xs text-rose-500 mt-1">{fieldErrors.fornecedor}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -110,12 +150,13 @@ export default function CadastroPagamentoForm() {
               name="valor_total"
               type="number"
               step="0.01"
-              min="0.01"
-              required
               placeholder="0,00"
               className="w-full rounded-lg border border-zinc-800 bg-zinc-900 pl-10 pr-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
           </div>
+          {fieldErrors.valor_total && (
+            <p className="text-xs text-rose-500 mt-1">{fieldErrors.valor_total}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -126,9 +167,11 @@ export default function CadastroPagamentoForm() {
             id="data_vencimento"
             name="data_vencimento"
             type="date"
-            required
             className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
+          {fieldErrors.data_vencimento && (
+            <p className="text-xs text-rose-500 mt-1">{fieldErrors.data_vencimento}</p>
+          )}
         </div>
 
         <div className="space-y-2 sm:col-span-2">
@@ -138,7 +181,6 @@ export default function CadastroPagamentoForm() {
           <select
             id="equipe"
             name="equipe"
-            required
             className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
             <option value="">Selecione uma equipe...</option>
@@ -146,6 +188,9 @@ export default function CadastroPagamentoForm() {
               <option key={eq} value={eq}>{eq}</option>
             ))}
           </select>
+          {fieldErrors.equipe && (
+            <p className="text-xs text-rose-500 mt-1">{fieldErrors.equipe}</p>
+          )}
         </div>
 
         <div className="space-y-2 sm:col-span-2">
@@ -155,16 +200,230 @@ export default function CadastroPagamentoForm() {
           <textarea
             id="finalidade"
             name="finalidade"
-            required
             rows={3}
             placeholder="Qual a finalidade deste orçamento/pagamento?"
             className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
           />
+          {fieldErrors.finalidade && (
+            <p className="text-xs text-rose-500 mt-1">{fieldErrors.finalidade}</p>
+          )}
         </div>
 
+        {/* Sistema Estruturado de Forma de Pagamento */}
+        <div className="space-y-3 sm:col-span-2">
+          <label className="text-sm font-medium text-zinc-300 block">
+            Forma de Pagamento <span className="text-rose-500">*</span>
+          </label>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {/* Opção PIX */}
+            <label
+              className={`flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
+                metodoPagamento === 'pix'
+                  ? 'border-indigo-500 bg-indigo-600/10 text-white shadow-lg shadow-indigo-600/5'
+                  : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+              }`}
+            >
+              <input
+                type="radio"
+                name="metodo_pagamento"
+                value="pix"
+                checked={metodoPagamento === 'pix'}
+                onChange={() => setMetodoPagamento('pix')}
+                className="sr-only"
+              />
+              <QrCode className={`w-5 h-5 shrink-0 ${metodoPagamento === 'pix' ? 'text-indigo-400' : 'text-zinc-500'}`} />
+              <div className="text-left">
+                <p className="text-sm font-semibold">PIX</p>
+                <p className="text-xs text-zinc-500">Chave rápida</p>
+              </div>
+            </label>
+
+            {/* Opção Transferência */}
+            <label
+              className={`flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
+                metodoPagamento === 'transferencia'
+                  ? 'border-indigo-500 bg-indigo-600/10 text-white shadow-lg shadow-indigo-600/5'
+                  : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+              }`}
+            >
+              <input
+                type="radio"
+                name="metodo_pagamento"
+                value="transferencia"
+                checked={metodoPagamento === 'transferencia'}
+                onChange={() => setMetodoPagamento('transferencia')}
+                className="sr-only"
+              />
+              <Building2 className={`w-5 h-5 shrink-0 ${metodoPagamento === 'transferencia' ? 'text-indigo-400' : 'text-zinc-500'}`} />
+              <div className="text-left">
+                <p className="text-sm font-semibold">Transferência</p>
+                <p className="text-xs text-zinc-500">TED/DOC/Depósito</p>
+              </div>
+            </label>
+
+            {/* Opção Boleto */}
+            <label
+              className={`flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
+                metodoPagamento === 'boleto'
+                  ? 'border-indigo-500 bg-indigo-600/10 text-white shadow-lg shadow-indigo-600/5'
+                  : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+              }`}
+            >
+              <input
+                type="radio"
+                name="metodo_pagamento"
+                value="boleto"
+                checked={metodoPagamento === 'boleto'}
+                onChange={() => setMetodoPagamento('boleto')}
+                className="sr-only"
+              />
+              <FileText className={`w-5 h-5 shrink-0 ${metodoPagamento === 'boleto' ? 'text-indigo-400' : 'text-zinc-500'}`} />
+              <div className="text-left">
+                <p className="text-sm font-semibold">Boleto Bancário</p>
+                <p className="text-xs text-zinc-500">Código de barras</p>
+              </div>
+            </label>
+          </div>
+          {fieldErrors.metodo_pagamento && (
+            <p className="text-xs text-rose-500 mt-1">{fieldErrors.metodo_pagamento}</p>
+          )}
+        </div>
+
+        {/* Campos Condicionais baseados na Forma de Pagamento */}
+        {metodoPagamento === 'pix' && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:col-span-2 transition-all duration-200">
+            <div className="space-y-2 sm:col-span-2">
+              <label htmlFor="chave_pix" className="text-sm font-medium text-zinc-300">
+                Chave PIX <span className="text-rose-500">*</span>
+              </label>
+              <input
+                id="chave_pix"
+                name="chave_pix"
+                placeholder="CPF/CNPJ, E-mail, Telefone ou Chave Aleatória"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              {fieldErrors.chave_pix && (
+                <p className="text-xs text-rose-500 mt-1">{fieldErrors.chave_pix}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="pix_nome" className="text-sm font-medium text-zinc-300">
+                Nome do Beneficiário / Titular (Opcional)
+              </label>
+              <input
+                id="pix_nome"
+                name="pix_nome"
+                placeholder="Para conferência do PIX"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              {fieldErrors.pix_nome && (
+                <p className="text-xs text-rose-500 mt-1">{fieldErrors.pix_nome}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="pix_banco" className="text-sm font-medium text-zinc-300">
+                Banco / Instituição (Opcional)
+              </label>
+              <input
+                id="pix_banco"
+                name="pix_banco"
+                placeholder="Ex: Nubank, Itaú, BB"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              {fieldErrors.pix_banco && (
+                <p className="text-xs text-rose-500 mt-1">{fieldErrors.pix_banco}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {metodoPagamento === 'transferencia' && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:col-span-2 transition-all duration-200">
+            <div className="space-y-2">
+              <label htmlFor="banco" className="text-sm font-medium text-zinc-300">
+                Banco <span className="text-rose-500">*</span>
+              </label>
+              <input
+                id="banco"
+                name="banco"
+                placeholder="Ex: Banco do Brasil"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              {fieldErrors.banco && (
+                <p className="text-xs text-rose-500 mt-1">{fieldErrors.banco}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="agencia" className="text-sm font-medium text-zinc-300">
+                Agência <span className="text-rose-500">*</span>
+              </label>
+              <input
+                id="agencia"
+                name="agencia"
+                placeholder="Ex: 1234"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              {fieldErrors.agencia && (
+                <p className="text-xs text-rose-500 mt-1">{fieldErrors.agencia}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="conta" className="text-sm font-medium text-zinc-300">
+                Conta (com dígito) <span className="text-rose-500">*</span>
+              </label>
+              <input
+                id="conta"
+                name="conta"
+                placeholder="Ex: 12345-6"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              {fieldErrors.conta && (
+                <p className="text-xs text-rose-500 mt-1">{fieldErrors.conta}</p>
+              )}
+            </div>
+            <div className="space-y-2 sm:col-span-3">
+              <label htmlFor="cpf_cnpj" className="text-sm font-medium text-zinc-300">
+                CPF/CNPJ do Titular (Opcional)
+              </label>
+              <input
+                id="cpf_cnpj"
+                name="cpf_cnpj"
+                placeholder="Ex: 000.000.000-00"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              {fieldErrors.cpf_cnpj && (
+                <p className="text-xs text-rose-500 mt-1">{fieldErrors.cpf_cnpj}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {metodoPagamento === 'boleto' && (
+          <div className="space-y-4 sm:col-span-2 transition-all duration-200">
+            <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-4 text-sm text-blue-200 leading-relaxed">
+              Você selecionou Boleto. Por favor, certifique-se de anexar o arquivo do boleto junto com o orçamento na área de upload abaixo.
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="codigo_barras" className="text-sm font-medium text-zinc-300">
+                Código de Barras / Linha Digitável (Opcional)
+              </label>
+              <input
+                id="codigo_barras"
+                name="codigo_barras"
+                placeholder="Ex: 00190.00009 02708.318006 41256.345678 1 93240000035000"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              {fieldErrors.codigo_barras && (
+                <p className="text-xs text-rose-500 mt-1">{fieldErrors.codigo_barras}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Campo de observações mantido opcional */}
         <div className="space-y-2 sm:col-span-2">
           <label htmlFor="observacoes" className="text-sm font-medium text-zinc-300">
-            Observações (Opcional)
+            Observações Adicionais (Opcional)
           </label>
           <textarea
             id="observacoes"
@@ -173,6 +432,9 @@ export default function CadastroPagamentoForm() {
             placeholder="Alguma informação adicional para o financeiro?"
             className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
           />
+          {fieldErrors.observacoes && (
+            <p className="text-xs text-rose-500 mt-1">{fieldErrors.observacoes}</p>
+          )}
         </div>
       </div>
 
@@ -236,9 +498,16 @@ export default function CadastroPagamentoForm() {
         <button
           type="submit"
           disabled={loading || !file}
-          className="w-full rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? 'Enviando...' : 'Enviar Solicitação'}
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Enviando...
+            </>
+          ) : (
+            'Enviar Solicitação'
+          )}
         </button>
       </div>
     </form>

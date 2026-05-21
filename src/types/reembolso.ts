@@ -8,6 +8,13 @@ export type ReembolsoPendente = Prisma.ReembolsoGetPayload<{
   };
 }>;
 
+export type HistoryItem = {
+  id: string;
+  acao: string;
+  descricao: string;
+  criado_em: Date | string;
+};
+
 export type SolicitacaoFinanceiro = {
   tipo: 'reembolso' | 'orcamento';
   id: string;
@@ -23,7 +30,8 @@ export type SolicitacaoFinanceiro = {
   anexo_url: string;
   anexo_nf_url?: string | null;
   numero_nf?: string | null;
-  historico: any[];
+  historico: HistoryItem[];
   lancamento_id?: string | null;
   valor_aprovado?: number | null;
+  observacoes?: string | null;
 };
