@@ -72,7 +72,7 @@ export default function CadastroPagamentoForm() {
         </div>
       )}
 
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2">
         <div className="space-y-2">
           <label htmlFor="descricao" className="text-sm font-medium text-zinc-300">
             Descrição do Pagamento
@@ -186,7 +186,7 @@ export default function CadastroPagamentoForm() {
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
-          className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors ${
+          className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 sm:p-8 transition-colors text-center ${
             dragActive 
               ? 'border-indigo-500 bg-indigo-500/10' 
               : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700 hover:bg-zinc-800/50'
@@ -208,7 +208,7 @@ export default function CadastroPagamentoForm() {
           ) : (
             <div className="flex flex-col items-center text-center">
               <UploadCloud className={`h-10 w-10 mb-4 ${dragActive ? 'text-indigo-400' : 'text-zinc-500'}`} />
-              <p className="text-sm font-medium text-white mb-1">
+              <p className="text-sm font-medium text-white mb-1 break-words">
                 Arraste o arquivo do orçamento ou clique para enviar
               </p>
               <p className="text-xs text-zinc-500 mb-4">

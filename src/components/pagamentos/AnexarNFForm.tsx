@@ -65,7 +65,7 @@ export default function AnexarNFForm({ pagamentoId }: { pagamentoId: string }) {
         </div>
       )}
 
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2">
         <div className="space-y-2">
           <label htmlFor="numero_nf" className="text-sm font-medium text-zinc-300">
             Número da Nota Fiscal
@@ -103,7 +103,7 @@ export default function AnexarNFForm({ pagamentoId }: { pagamentoId: string }) {
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
-          className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors ${
+          className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 sm:p-8 transition-colors text-center ${
             dragActive 
               ? 'border-indigo-500 bg-indigo-500/10' 
               : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700 hover:bg-zinc-800/50'
@@ -125,7 +125,7 @@ export default function AnexarNFForm({ pagamentoId }: { pagamentoId: string }) {
           ) : (
             <div className="flex flex-col items-center text-center">
               <UploadCloud className={`h-10 w-10 mb-4 ${dragActive ? 'text-indigo-400' : 'text-zinc-500'}`} />
-              <p className="text-sm font-medium text-white mb-1">
+              <p className="text-sm font-medium text-white mb-1 break-words">
                 Arraste o arquivo da NF ou clique para enviar
               </p>
               <p className="text-xs text-zinc-500 mb-4">
@@ -149,18 +149,18 @@ export default function AnexarNFForm({ pagamentoId }: { pagamentoId: string }) {
         </div>
       </div>
 
-      <div className="pt-4 flex items-center justify-between">
+      <div className="pt-4 flex flex-col-reverse sm:flex-row items-center justify-between gap-3">
         <button
           type="button"
           onClick={() => router.back()}
-          className="rounded-lg px-4 py-3 text-sm font-semibold text-zinc-400 hover:text-white transition"
+          className="w-full sm:w-auto rounded-lg px-4 py-3 text-sm font-semibold text-zinc-400 hover:bg-zinc-900 hover:text-white transition"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={loading || !file}
-          className="rounded-lg bg-indigo-600 px-8 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full sm:w-auto rounded-lg bg-indigo-600 px-8 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Enviando...' : 'Enviar Nota Fiscal'}
         </button>
