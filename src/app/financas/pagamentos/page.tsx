@@ -52,6 +52,7 @@ export default async function FinancasPagamentosPage(props: {
     lancamento_id: p.lancamento_id,
     valor_aprovado: p.valor_aprovado,
     observacoes: p.observacoes,
+    lancamentos: p.lancamentos,
   }));
 
   const solicitacoes: SolicitacaoFinanceiro[] = [...reembolsosParsed, ...pagamentosParsed]

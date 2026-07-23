@@ -10,15 +10,19 @@ async function uploadFileToStorage(path: string, file: File) {
   const buffer = Buffer.from(await file.arrayBuffer());
 
   if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const blob = await put(path, buffer, {
-      access: 'public',
-      addRandomSuffix: true,
-      contentType: file.type,
-    });
-    return blob.url;
+    try {
+      const blob = await put(path, buffer, {
+        access: 'public',
+        addRandomSuffix: true,
+        contentType: file.type,
+      });
+      return blob.url;
+    } catch (err) {
+      console.warn('Falha no upload do Vercel Blob, utilizando fallback base64:', err);
+    }
   }
 
-  // Fallback local/dev quando token do Blob não estiver configurado.
+  // Fallback local/dev quando token do Blob não estiver configurado ou falhar.
   const mimeType = file.type || 'application/octet-stream';
   return `data:${mimeType};base64,${buffer.toString('base64')}`;
 }
@@ -464,20 +468,51 @@ export async function completePayment(id: string) {
       });
     } else if (transaction.referenceType === 'pagamento' && transaction.referenceId) {
       const session = await getCurrentSession();
+      const pagamentoId = transaction.referenceId;
 
-      await prisma.pagamentoOrcamento.update({
-        where: { id: transaction.referenceId },
-        data: { status: 'pago' }
+      const pagamento = await prisma.pagamentoOrcamento.findUnique({
+        where: { id: pagamentoId },
       });
 
-      await prisma.pagamentoOrcamentoHistory.create({
-        data: {
-          pagamento_id: transaction.referenceId,
-          usuario_id: session?.usuarioId,
-          acao: 'PAGO',
-          descricao: 'Lançamento financeiro marcado como pago. Aguardando envio da Nota Fiscal.',
-        }
-      });
+      if (pagamento) {
+        const targetAmount = pagamento.valor_aprovado ?? pagamento.valor_total;
+
+        // Buscar todas as transações concluídas deste orçamento (incluindo a atual)
+        const completedTransactions = await prisma.transaction.findMany({
+          where: {
+            referenceType: 'pagamento',
+            referenceId: pagamentoId,
+            OR: [
+              { status: 'COMPLETED' },
+              { id: transaction.id }
+            ]
+          }
+        });
+
+        const totalPago = completedTransactions.reduce((sum, t) => sum + t.amount, 0);
+        const isFullyPaid = totalPago >= targetAmount - 0.01;
+        const newStatus = isFullyPaid ? 'pago' : 'pago_parcial';
+
+        await prisma.pagamentoOrcamento.update({
+          where: { id: pagamentoId },
+          data: { status: newStatus }
+        });
+
+        const valorFormat = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(transaction.amount);
+        const totalPagoFormat = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPago);
+        const targetFormat = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(targetAmount);
+
+        await prisma.pagamentoOrcamentoHistory.create({
+          data: {
+            pagamento_id: pagamentoId,
+            usuario_id: session?.usuarioId,
+            acao: isFullyPaid ? 'PAGO' : 'PAGAMENTO_PARCIAL',
+            descricao: isFullyPaid
+              ? `Lançamento financeiro de ${valorFormat} marcado como pago. Valor total quitado (${totalPagoFormat} de ${targetFormat}). Aguardando envio da Nota Fiscal.`
+              : `Lançamento de pagamento parcial de ${valorFormat} marcado como pago. Total pago até o momento: ${totalPagoFormat} de ${targetFormat}.`
+          }
+        });
+      }
     }
 
     revalidatePath('/');

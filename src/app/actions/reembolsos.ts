@@ -17,15 +17,19 @@ async function uploadFileToStorage(usuario_id: string, file: File | null) {
     const timestamp = Date.now();
     const path = `reembolsos/${usuario_id}/${timestamp}-${file.name}`;
 
-    const blob = await put(path, buffer, {
-      access: 'public',
-      addRandomSuffix: true,
-      contentType: file.type,
-    });
-    return blob.url;
+    try {
+      const blob = await put(path, buffer, {
+        access: 'public',
+        addRandomSuffix: true,
+        contentType: file.type,
+      });
+      return blob.url;
+    } catch (err) {
+      console.warn('Falha no upload do Vercel Blob, utilizando fallback base64:', err);
+    }
   }
 
-  // Fallback local/dev quando token do Blob não estiver configurado.
+  // Fallback local/dev quando token do Blob não estiver configurado ou falhar.
   const mimeType = file.type || 'application/octet-stream';
   return `data:${mimeType};base64,${buffer.toString('base64')}`;
 }

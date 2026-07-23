@@ -17,12 +17,16 @@ async function uploadFileToStorage(usuario_id: string, file: File | null, folder
     const timestamp = Date.now();
     const path = `${folder}/${usuario_id}/${timestamp}-${file.name}`;
 
-    const blob = await put(path, buffer, {
-      access: 'public',
-      addRandomSuffix: true,
-      contentType: file.type,
-    });
-    return blob.url;
+    try {
+      const blob = await put(path, buffer, {
+        access: 'public',
+        addRandomSuffix: true,
+        contentType: file.type,
+      });
+      return blob.url;
+    } catch (err) {
+      console.warn('Falha no upload do Vercel Blob, utilizando fallback base64:', err);
+    }
   }
 
   const mimeType = file.type || 'application/octet-stream';
@@ -157,7 +161,7 @@ export async function listarMeusPagamentos() {
 
     if (!session || session.perfil !== 'equipe') return [];
 
-    return await prisma.pagamentoOrcamento.findMany({
+    const pagamentos = await prisma.pagamentoOrcamento.findMany({
       where: { usuario_id: session.usuarioId },
       include: {
         historico: {
@@ -167,6 +171,20 @@ export async function listarMeusPagamentos() {
       },
       orderBy: { criado_em: 'desc' },
     });
+
+    const pagamentoIds = pagamentos.map(p => p.id);
+    const todosLancamentos = await prisma.transaction.findMany({
+      where: {
+        referenceType: 'pagamento',
+        referenceId: { in: pagamentoIds },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    return pagamentos.map(p => ({
+      ...p,
+      lancamentos: todosLancamentos.filter(l => l.referenceId === p.id),
+    }));
   } catch (error) {
     console.error('ERRO AO LISTAR MEUS PAGAMENTOS:', error);
     return [];
@@ -200,8 +218,8 @@ export async function enviarNotaFiscal(pagamentoId: string, formData: FormData) 
       return { success: false, error: 'Pagamento não encontrado ou sem permissão.' };
     }
 
-    if (pagamento.status !== 'pago') {
-      return { success: false, error: 'O pagamento precisa estar com status pago para enviar NF.' };
+    if (!['pago', 'pago_parcial'].includes(pagamento.status)) {
+      return { success: false, error: 'O pagamento precisa estar pago para enviar NF.' };
     }
 
     const anexo_nf_url = await uploadFileToStorage(session.usuarioId, file, 'reembolsos');
@@ -265,7 +283,7 @@ export async function listarPagamentosFinanceiro(filtros?: {
       ];
     }
 
-    return await prisma.pagamentoOrcamento.findMany({
+    const pagamentos = await prisma.pagamentoOrcamento.findMany({
       where: whereClause,
       include: { 
         usuario: true,
@@ -274,6 +292,20 @@ export async function listarPagamentosFinanceiro(filtros?: {
       },
       orderBy: { criado_em: 'desc' },
     });
+
+    const pagamentoIds = pagamentos.map(p => p.id);
+    const todosLancamentos = await prisma.transaction.findMany({
+      where: {
+        referenceType: 'pagamento',
+        referenceId: { in: pagamentoIds },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    return pagamentos.map(p => ({
+      ...p,
+      lancamentos: todosLancamentos.filter(l => l.referenceId === p.id),
+    }));
   } catch (error) {
     console.error('ERRO AO LISTAR PAGAMENTOS:', error);
     return [];
@@ -320,42 +352,13 @@ export async function aprovarPagamento(
       };
     }
 
-    const currentMonth = await getCurrentMonth();
-
-    if (!currentMonth) {
-      return {
-        success: false,
-        error: 'Não há um mês financeiro aberto para realizar o lançamento.',
-      };
-    }
-
     await prisma.$transaction(async (tx) => {
       const valorFinal = valorAprovado !== undefined && valorAprovado >= 0 ? valorAprovado : pagamento.valor_total;
-
-      const transaction = await tx.transaction.create({
-        data: {
-          date: pagamento.data_vencimento,
-          description: `Pagamento — ${pagamento.fornecedor} - ${pagamento.descricao} (${pagamento.equipe})`,
-          type: 'OUT',
-          amount: valorFinal,
-          status: 'PENDING',
-          monthId: currentMonth.id,
-          referenceType: 'pagamento',
-          referenceId: pagamento.id,
-          attachments: {
-            create: {
-              url: pagamento.anexo_orcamento_url,
-              filename: `Orçamento - ${pagamento.descricao}`,
-            }
-          }
-        },
-      });
 
       await tx.pagamentoOrcamento.update({
         where: { id: pagamentoId },
         data: { 
           status: 'aprovado', 
-          lancamento_id: transaction.id,
           ...(valorAprovado !== undefined && { valor_aprovado: valorFinal }) 
         },
       });
@@ -376,7 +379,7 @@ export async function aprovarPagamento(
           pagamento_id: pagamentoId,
           usuario_id: session.usuarioId,
           acao: 'APROVADO',
-          descricao: 'Pagamento aprovado pelo financeiro e convertido em lançamento.',
+          descricao: 'Solicitação de orçamento aprovada pelo financeiro. Aguardando registro dos pagamentos/parcelas.',
         }
       });
     });
@@ -386,6 +389,121 @@ export async function aprovarPagamento(
   } catch (error) {
     console.error('ERRO AO APROVAR PAGAMENTO:', error);
     return { success: false, error: 'Erro ao aprovar o pagamento.' };
+  }
+}
+
+export async function registrarPagamentoParcial(
+  pagamentoId: string,
+  valor: number,
+  descricaoPagamento?: string,
+  dataPagamento?: string
+) {
+  try {
+    const session = await getCurrentSession();
+
+    if (session?.perfil !== 'financas') {
+      return { success: false, error: 'Acesso negado.' };
+    }
+
+    if (!valor || valor <= 0) {
+      return { success: false, error: 'Informe um valor de pagamento válido.' };
+    }
+
+    const pagamento = await prisma.pagamentoOrcamento.findUnique({
+      where: { id: pagamentoId },
+    });
+
+    if (!pagamento || !['aprovado', 'pago_parcial'].includes(pagamento.status)) {
+      return {
+        success: false,
+        error: 'Pagamento não encontrado ou não está em status aprovado ou pago parcial.',
+      };
+    }
+
+    const currentMonth = await getCurrentMonth();
+
+    if (!currentMonth) {
+      return {
+        success: false,
+        error: 'Não há um mês financeiro aberto para realizar o lançamento.',
+      };
+    }
+
+    const valorAlvo = pagamento.valor_aprovado ?? pagamento.valor_total;
+
+    // Buscar lançamentos já existentes para este orçamento
+    const lancamentosExistentes = await prisma.transaction.findMany({
+      where: {
+        referenceType: 'pagamento',
+        referenceId: pagamentoId,
+      },
+    });
+
+    const totalLancado = lancamentosExistentes.reduce((acc, t) => acc + t.amount, 0);
+    const restante = valorAlvo - totalLancado;
+
+    if (valor > restante + 0.01) {
+      const valorFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+      const restanteFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(restante > 0 ? restante : 0);
+      return {
+        success: false,
+        error: `O valor informado (${valorFormatado}) ultrapassa o saldo restante a lançar (${restanteFormatado}).`,
+      };
+    }
+
+    const date = dataPagamento ? new Date(`${dataPagamento}T12:00:00Z`) : pagamento.data_vencimento;
+    const desc = descricaoPagamento?.trim() || `Pagamento Parcial — ${pagamento.fornecedor} - ${pagamento.descricao} (${pagamento.equipe})`;
+
+    await prisma.$transaction(async (tx) => {
+      const transaction = await tx.transaction.create({
+        data: {
+          date,
+          description: desc,
+          type: 'OUT',
+          amount: valor,
+          status: 'PENDING', // Criado como Pendente no financeiro
+          monthId: currentMonth.id,
+          referenceType: 'pagamento',
+          referenceId: pagamento.id,
+          attachments: {
+            create: {
+              url: pagamento.anexo_orcamento_url,
+              filename: `Orçamento - ${pagamento.descricao}`,
+            },
+          },
+        },
+      });
+
+      const novoStatus = pagamento.status === 'aprovado' ? 'pago_parcial' : pagamento.status;
+
+      await tx.pagamentoOrcamento.update({
+        where: { id: pagamentoId },
+        data: {
+          status: novoStatus,
+          lancamento_id: transaction.id,
+        },
+      });
+
+      const valorFormat = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+      await tx.pagamentoOrcamentoHistory.create({
+        data: {
+          pagamento_id: pagamentoId,
+          usuario_id: session.usuarioId,
+          acao: 'PAGAMENTO_PARCIAL',
+          descricao: `Lançamento de pagamento parcial no valor de ${valorFormat} registrado (pendente no financeiro).`,
+        },
+      });
+    });
+
+    revalidatePagamentoViews();
+    return { success: true };
+  } catch (error: unknown) {
+    console.error('ERRO AO REGISTRAR PAGAMENTO PARCIAL:', error);
+    const message = error instanceof Error ? error.message : 'Desconhecido';
+    return {
+      success: false,
+      error: `Erro ao registrar pagamento parcial: ${message}`,
+    };
   }
 }
 

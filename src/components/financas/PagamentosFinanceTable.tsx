@@ -15,11 +15,24 @@ import {
   History,
   ReceiptText,
   FileText,
-  Building2
+  Building2,
+  Plus
 } from 'lucide-react';
 import { aprovarReembolso, rejeitarReembolso } from '@/app/actions/reembolsos';
-import { aprovarPagamento, rejeitarPagamento, validarNotaFiscal } from '@/app/actions/pagamentos';
+import { aprovarPagamento, rejeitarPagamento, validarNotaFiscal, registrarPagamentoParcial } from '@/app/actions/pagamentos';
 import type { SolicitacaoFinanceiro } from '@/types/reembolso';
+
+function formatDateUTC(dateInput: Date | string) {
+  if (!dateInput) return '';
+  const str = typeof dateInput === 'string' ? dateInput : dateInput.toISOString();
+  const datePart = str.split('T')[0];
+  const parts = datePart.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    const [year, month, day] = parts;
+    return `${day}/${month}/${year}`;
+  }
+  return new Date(dateInput).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', {
@@ -41,6 +54,7 @@ function statusBadge(status: string) {
     pendente_reembolso: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
     pendente_aprovacao: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
     aprovado: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+    pago_parcial: 'border-blue-500/30 bg-blue-500/10 text-blue-200',
     rejeitado: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
     pago: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
     nf_enviada: 'border-purple-500/30 bg-purple-500/10 text-purple-200',
@@ -51,6 +65,7 @@ function statusBadge(status: string) {
     pendente_reembolso: 'Pendente',
     pendente_aprovacao: 'Pendente',
     aprovado: 'Aprovado',
+    pago_parcial: 'Pago Parcial',
     rejeitado: 'Rejeitado',
     pago: 'Aguard. NF',
     nf_enviada: 'NF Enviada',
@@ -89,6 +104,43 @@ export default function PagamentosFinanceTable({
   const [statusFilter, setStatusFilter] = useState('');
   const [equipeFilter, setEquipeFilter] = useState('');
   const [tipoFilter, setTipoFilter] = useState<'todas' | 'reembolso' | 'orcamento'>('todas');
+
+  // Partial payment form state
+  const [isRegisteringPartial, setIsRegisteringPartial] = useState(false);
+  const [valorPartial, setValorPartial] = useState<number | ''>('');
+  const [descricaoPartial, setDescricaoPartial] = useState('');
+  const [dataPartial, setDataPartial] = useState('');
+
+  async function handleRegisterPartial() {
+    if (!selected || typeof valorPartial !== 'number' || valorPartial <= 0) {
+      setError('Informe um valor válido para o pagamento parcial.');
+      return;
+    }
+
+    setLoadingAction(`register_partial:${selected.id}`);
+    setError('');
+
+    const res = await registrarPagamentoParcial(
+      selected.id,
+      valorPartial,
+      descricaoPartial,
+      dataPartial
+    );
+
+    setLoadingAction('');
+
+    if (!res.success) {
+      setError(res.error || 'Erro ao registrar pagamento parcial.');
+      return;
+    }
+
+    setIsRegisteringPartial(false);
+    setValorPartial('');
+    setDescricaoPartial('');
+    setDataPartial('');
+    setSelected(null);
+    router.refresh();
+  }
 
   function applyFilters() {
     const params = new URLSearchParams();
@@ -164,6 +216,32 @@ export default function PagamentosFinanceTable({
     return null;
   })();
 
+  // Cálculo de progresso de pagamentos parciais para orçamentos
+  const partialInfo = (() => {
+    if (!selected || selected.tipo !== 'orcamento') return null;
+    const targetAmount = selected.valor_aprovado ?? selected.valor;
+    const lancamentos = selected.lancamentos || [];
+    const totalLancado = lancamentos.reduce((acc, l) => acc + l.amount, 0);
+    const totalPago = lancamentos.filter(l => l.status === 'COMPLETED').reduce((acc, l) => acc + l.amount, 0);
+    const totalPendente = lancamentos.filter(l => l.status === 'PENDING').reduce((acc, l) => acc + l.amount, 0);
+    const restanteALancar = Math.max(0, targetAmount - totalLancado);
+    const restanteAPagar = Math.max(0, targetAmount - totalPago);
+    const pctPago = Math.min(100, Math.round((totalPago / (targetAmount || 1)) * 100));
+    const pctLancado = Math.min(100, Math.round((totalLancado / (targetAmount || 1)) * 100));
+
+    return {
+      targetAmount,
+      lancamentos,
+      totalLancado,
+      totalPago,
+      totalPendente,
+      restanteALancar,
+      restanteAPagar,
+      pctPago,
+      pctLancado,
+    };
+  })();
+
   return (
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end">
@@ -213,6 +291,7 @@ export default function PagamentosFinanceTable({
             <option value="">Todos</option>
             <option value="pendente_reembolso">Pendentes</option>
             <option value="aprovado">Aprovados</option>
+            <option value="pago_parcial">Pagos Parciais</option>
             <option value="rejeitado">Rejeitados</option>
             <option value="pago">Aguardando NF</option>
             <option value="nf_enviada">NF Enviada</option>
@@ -281,6 +360,10 @@ export default function PagamentosFinanceTable({
                       setIsApproving(false);
                       setValorAprovado(solicitacao.valor);
                       setJustificativa('');
+                      setIsRegisteringPartial(false);
+                      setValorPartial('');
+                      setDescricaoPartial('');
+                      setDataPartial('');
                     }}
                     className="cursor-pointer transition hover:bg-zinc-800/60"
                   >
@@ -592,8 +675,148 @@ export default function PagamentosFinanceTable({
                   </div>
                 </div>
 
-                {/* Coluna Direita: Avaliação e Histórico */}
+                {/* Coluna Direita: Avaliação, Pagamentos Parciais e Histórico */}
                 <div className="space-y-6 flex flex-col">
+                  {/* Seção de Progresso e Registro de Pagamento Parcial para Orçamentos */}
+                  {partialInfo && ['aprovado', 'pago_parcial', 'pago', 'nf_enviada', 'concluido'].includes(selected.status) && (
+                    <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-5 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-blue-300 flex items-center gap-2">
+                          <CreditCard className="w-4 h-4" /> Pagamento por Partes (Progresso)
+                        </h3>
+                        <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/20">
+                          {partialInfo.pctPago}% Pago
+                        </span>
+                      </div>
+
+                      {/* Barra de Progresso */}
+                      <div>
+                        <div className="flex justify-between text-xs text-zinc-400 mb-1.5">
+                          <span>Pago: <strong className="text-white">{formatCurrency(partialInfo.totalPago)}</strong></span>
+                          <span>Alvo: <strong className="text-zinc-200">{formatCurrency(partialInfo.targetAmount)}</strong></span>
+                        </div>
+                        <div className="w-full h-2.5 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800 relative">
+                          <div
+                            className="h-full bg-emerald-500 transition-all duration-300"
+                            style={{ width: `${partialInfo.pctPago}%` }}
+                          />
+                        </div>
+                        {partialInfo.totalPendente > 0 ? (
+                          <p className="text-xs text-amber-400 mt-1">
+                            Pendente no financeiro: {formatCurrency(partialInfo.totalPendente)}
+                          </p>
+                        ) : partialInfo.restanteALancar > 0 ? (
+                          <p className="text-xs text-indigo-300 mt-1">
+                            Restante a lançar: {formatCurrency(partialInfo.restanteALancar)}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      {/* Lista de Lançamentos de Parcelas */}
+                      {partialInfo.lancamentos.length > 0 && (
+                        <div className="space-y-2">
+                          <strong className="block text-xs uppercase tracking-wider text-zinc-400">Parcelas do Orçamento ({partialInfo.lancamentos.length}):</strong>
+                          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                            {partialInfo.lancamentos.map((l, idx) => (
+                              <div key={l.id} className="flex items-center justify-between bg-zinc-950 p-3 rounded-lg border border-zinc-800 text-xs">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-white">Parcela #{idx + 1}: {formatCurrency(l.amount)}</span>
+                                    <span className="text-[10px] text-zinc-500">({formatDateUTC(l.date)})</span>
+                                  </div>
+                                  <p className="text-zinc-400 text-[11px] truncate max-w-[220px] mt-0.5">{l.description}</p>
+                                </div>
+                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${l.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/10 text-amber-300 border-amber-500/30'}`}>
+                                  {l.status === 'COMPLETED' ? 'Concluído' : 'Pendente'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Botão/Formulário para Lançar Nova Parcela ou Pagamento Total */}
+                      {['aprovado', 'pago_parcial'].includes(selected.status) && (
+                        <div className="pt-2">
+                          {!isRegisteringPartial ? (
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsRegisteringPartial(true);
+                                  setValorPartial(partialInfo.restanteALancar > 0 ? partialInfo.restanteALancar : '');
+                                }}
+                                className="flex-1 py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-md"
+                              >
+                                <Plus className="w-4 h-4" />
+                                {partialInfo.lancamentos.length === 0 ? 'Lançar Pagamento Total ou Parcial' : 'Registrar Nova Parcela'}
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="bg-zinc-950 p-4 rounded-lg border border-indigo-500/30 space-y-3">
+                              <h4 className="text-xs font-semibold text-indigo-300">Novo Lançamento Parcial</h4>
+                              
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-[11px] text-zinc-400 mb-1">Valor da Parcela (R$)*</label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    max={partialInfo.restanteALancar}
+                                    value={valorPartial}
+                                    onChange={(e) => setValorPartial(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                    placeholder={`Máx: R$ ${partialInfo.restanteALancar.toFixed(2)}`}
+                                    className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-white outline-none focus:border-indigo-500"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] text-zinc-400 mb-1">Data de Vencimento/Pagamento</label>
+                                  <input
+                                    type="date"
+                                    value={dataPartial}
+                                    onChange={(e) => setDataPartial(e.target.value)}
+                                    className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-white outline-none focus:border-indigo-500"
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] text-zinc-400 mb-1">Descrição / Identificação da Parcela (Opcional)</label>
+                                <input
+                                  type="text"
+                                  value={descricaoPartial}
+                                  onChange={(e) => setDescricaoPartial(e.target.value)}
+                                  placeholder="ex: Parcela 1/2 - Sinal ou Item específico"
+                                  className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-white outline-none focus:border-indigo-500"
+                                />
+                              </div>
+
+                              <div className="flex justify-end gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setIsRegisteringPartial(false)}
+                                  disabled={loadingAction === `register_partial:${selected.id}`}
+                                  className="px-3 py-1.5 rounded-md border border-zinc-700 bg-zinc-900 text-xs text-zinc-300 hover:bg-zinc-800 transition"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleRegisterPartial}
+                                  disabled={loadingAction === `register_partial:${selected.id}`}
+                                  className="px-4 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition disabled:opacity-50"
+                                >
+                                  {loadingAction === `register_partial:${selected.id}` ? 'Registrando...' : 'Confirmar Lançamento'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {isApproving ? (
                     <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 mb-4">
                       <h3 className="text-sm font-medium text-emerald-400 mb-3">Aprovação de {selected.tipo === 'reembolso' ? 'Reembolso' : 'Pagamento'}</h3>
@@ -728,14 +951,30 @@ export default function PagamentosFinanceTable({
               </div>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end border-t border-zinc-800 pt-6 shrink-0 bg-zinc-900">
-                {selected.lancamento_id && (
+                {(selected.lancamento_id || (selected.lancamentos && selected.lancamentos.length > 0)) && (
                   <button
                     type="button"
                     onClick={() => router.push(`/financas/lancamentos?busca=${selected.descricao}`)}
                     className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-6 py-2.5 text-sm font-semibold text-indigo-300 transition hover:bg-indigo-600 hover:text-white"
                   >
                     <CreditCard className="w-5 h-5" />
-                    Visualizar Lançamento Financeiro
+                    Visualizar Lançamentos Financeiros
+                  </button>
+                )}
+
+                {selected.tipo === 'orcamento' && ['aprovado', 'pago_parcial'].includes(selected.status) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRegisteringPartial(true);
+                      if (partialInfo && partialInfo.restanteALancar > 0) {
+                        setValorPartial(partialInfo.restanteALancar);
+                      }
+                    }}
+                    className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 shadow-md"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Registrar Pagamento Parcial
                   </button>
                 )}
 

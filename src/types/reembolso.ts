@@ -34,4 +34,11 @@ export type SolicitacaoFinanceiro = {
   lancamento_id?: string | null;
   valor_aprovado?: number | null;
   observacoes?: string | null;
+  lancamentos?: Array<{
+    id: string;
+    amount: number;
+    status: string;
+    date: Date | string;
+    description: string;
+  }>;
 };

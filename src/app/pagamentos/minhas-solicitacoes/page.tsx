@@ -8,6 +8,18 @@ import NovaSolicitacaoMenu from '@/components/pagamentos/NovaSolicitacaoMenu';
 
 export const dynamic = 'force-dynamic';
 
+function formatDateUTC(dateInput: Date | string) {
+  if (!dateInput) return '';
+  const str = typeof dateInput === 'string' ? dateInput : dateInput.toISOString();
+  const datePart = str.split('T')[0];
+  const parts = datePart.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    const [year, month, day] = parts;
+    return `${day}/${month}/${year}`;
+  }
+  return new Date(dateInput).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+}
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -20,13 +32,21 @@ function statusBadge(status: string) {
     pendente_reembolso:
       'border-amber-500/30 bg-amber-500/10 text-amber-200',
     aprovado: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+    pago_parcial: 'border-blue-500/30 bg-blue-500/10 text-blue-200',
     rejeitado: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
+    pago: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+    nf_enviada: 'border-purple-500/30 bg-purple-500/10 text-purple-200',
+    concluido: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
   } as const;
 
   const labels = {
     pendente_reembolso: 'Pendente',
     aprovado: 'Aprovado',
+    pago_parcial: 'Pago Parcial',
     rejeitado: 'Rejeitado',
+    pago: 'Aguard. NF',
+    nf_enviada: 'NF Enviada',
+    concluido: 'Concluído',
   } as const;
 
   const key = status as keyof typeof styles;
@@ -99,7 +119,7 @@ export default async function MinhasSolicitacoesPage() {
                         {new Date(item.criado_em).toLocaleDateString('pt-BR')} ·{' '}
                         {item.equipe}
                         {!isReembolso && 'fornecedor' in item && ` · Fornecedor: ${item.fornecedor}`}
-                        {!isReembolso && 'data_vencimento' in item && ` · Vencimento: ${new Date(item.data_vencimento).toLocaleDateString('pt-BR')}`}
+                        {!isReembolso && 'data_vencimento' in item && ` · Vencimento: ${formatDateUTC(item.data_vencimento)}`}
                       </p>
                     </div>
                     <div className="text-right">
@@ -118,6 +138,30 @@ export default async function MinhasSolicitacoesPage() {
                     <div className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-100">
                       <strong className="text-rose-200">Motivo:</strong>{' '}
                       {item.motivo_rejeicao}
+                    </div>
+                  )}
+
+                  {!isReembolso && 'lancamentos' in item && item.lancamentos && item.lancamentos.length > 0 && (
+                    <div className="mt-4 rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 space-y-2.5">
+                      <div className="flex items-center justify-between text-xs font-semibold text-blue-300">
+                        <span>Parcelas do Orçamento ({item.lancamentos.length}):</span>
+                        <span>
+                          {formatCurrency(item.lancamentos.filter(l => l.status === 'COMPLETED').reduce((acc, l) => acc + l.amount, 0))} / {formatCurrency('valor_aprovado' in item && item.valor_aprovado ? item.valor_aprovado : ('valor_total' in item ? item.valor_total : 0))} Pago
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {item.lancamentos.map((l, idx) => (
+                          <div key={l.id} className="flex items-center justify-between text-xs bg-zinc-950/80 p-2.5 rounded-lg border border-zinc-800">
+                            <div>
+                              <p className="font-semibold text-white">Parcela #{idx + 1}: {formatCurrency(l.amount)}</p>
+                              <p className="text-zinc-400 text-[11px] truncate max-w-[250px]">{l.description}</p>
+                            </div>
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${l.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/10 text-amber-300 border-amber-500/30'}`}>
+                              {l.status === 'COMPLETED' ? 'Concluído' : 'Pendente'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -186,6 +230,7 @@ export default async function MinhasSolicitacoesPage() {
                                   {hist.acao === 'CRIADO' ? 'Solicitação Enviada' :
                                   hist.acao === 'APROVADO' ? 'Aprovado' :
                                   hist.acao === 'PAGO' ? 'Pago' :
+                                  hist.acao === 'PAGAMENTO_PARCIAL' ? 'Pagamento Parcial Registrado' :
                                   hist.acao === 'REJEITADO' ? 'Rejeitado' :
                                   hist.acao === 'VALOR_ALTERADO' ? 'Valor Alterado' :
                                   hist.acao === 'NF_ENVIADA' ? 'Nota Fiscal Enviada' :

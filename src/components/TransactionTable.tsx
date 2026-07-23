@@ -24,6 +24,18 @@ import {
 } from '@/app/actions/finance';
 import type { TransactionWithAttachments } from '@/types/finance';
 
+function formatDateUTC(dateInput: Date | string) {
+  if (!dateInput) return '';
+  const str = typeof dateInput === 'string' ? dateInput : dateInput.toISOString();
+  const datePart = str.split('T')[0];
+  const parts = datePart.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    const [year, month, day] = parts;
+    return `${day}/${month}/${year}`;
+  }
+  return new Date(dateInput).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+}
+
 export default function TransactionTable({
   transactions,
   monthClosed,
@@ -162,7 +174,7 @@ export default function TransactionTable({
                     className="hover:bg-zinc-800/30 transition-colors"
                   >
                     <td className="px-6 py-4 text-sm text-zinc-300">
-                      {format(new Date(t.date), 'dd/MM/yyyy')}
+                      {formatDateUTC(t.date)}
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-zinc-100">
                       <div>{t.description}</div>
