@@ -266,11 +266,54 @@ export async function getTransactions(monthId: string, filters?: {
   }
 }
 
+export async function recalculateChainBalancesFromMonth(startMonthId: string) {
+  try {
+    const allMonths = await prisma.monthBalance.findMany({
+      include: { transactions: true },
+      orderBy: [{ year: 'asc' }, { month: 'asc' }],
+    });
+
+    const startIdx = allMonths.findIndex((m) => m.id === startMonthId);
+    if (startIdx === -1) return;
+
+    for (let i = startIdx; i < allMonths.length; i++) {
+      const current = allMonths[i];
+      const totalIn = current.transactions
+        .filter((t) => t.type === 'IN' && t.status === 'COMPLETED')
+        .reduce((acc, t) => acc + t.amount, 0);
+
+      const totalOut = current.transactions
+        .filter((t) => t.type === 'OUT' && t.status === 'COMPLETED')
+        .reduce((acc, t) => acc + t.amount, 0);
+
+      const newFinalBalance = current.initialBalance + totalIn - totalOut;
+
+      await prisma.monthBalance.update({
+        where: { id: current.id },
+        data: { finalBalance: newFinalBalance },
+      });
+
+      if (i + 1 < allMonths.length) {
+        allMonths[i + 1].initialBalance = newFinalBalance;
+        await prisma.monthBalance.update({
+          where: { id: allMonths[i + 1].id },
+          data: { initialBalance: newFinalBalance },
+        });
+      }
+    }
+  } catch (error) {
+    console.error('ERRO AO RECALCULAR SALDOS EM CASCATA:', error);
+  }
+}
+
 export async function addTransaction(formData: FormData) {
   try {
+    const session = await getCurrentSession();
     const monthId = formData.get('monthId') as string;
+    const isRetroativo = formData.get('isRetroativo') === 'true';
+    const motivoRetroativo = String(formData.get('motivoRetroativo') || '').trim();
 
-    // Regra de segurança: bloquear imediatamente operações em mês fechado
+    // Regra de segurança: verificar status do mês
     const month = await prisma.monthBalance.findUnique({
       where: { id: monthId },
       select: { id: true, isClosed: true },
@@ -278,11 +321,20 @@ export async function addTransaction(formData: FormData) {
     if (!month) {
       return { success: false, error: 'Mês não encontrado.' };
     }
+
     if (month.isClosed) {
-      return {
-        success: false,
-        error: 'Não é possível adicionar transação em mês fechado.',
-      };
+      if (session?.perfil !== 'financas') {
+        return {
+          success: false,
+          error: 'Apenas usuários do financeiro podem realizar lançamentos retroativos em mês fechado.',
+        };
+      }
+      if (!isRetroativo || !motivoRetroativo) {
+        return {
+          success: false,
+          error: 'Para realizar um lançamento em mês fechado, informe o motivo do atraso/lançamento retroativo.',
+        };
+      }
     }
 
     const description = formData.get('description') as string;
@@ -292,10 +344,16 @@ export async function addTransaction(formData: FormData) {
     const status =
       (formData.get('status') as 'PENDING' | 'COMPLETED') || 'COMPLETED';
     const area = (formData.get('area') as string) || 'Outros';
-    const internalNotes = formData.get('internalNotes') as string | null;
+    const internalNotesInput = formData.get('internalNotes') as string | null;
 
     if (!dateStr || isNaN(new Date(dateStr).getTime())) {
       return { success: false, error: 'Por favor, insira uma data válida.' };
+    }
+
+    let internalNotes = internalNotesInput || undefined;
+    if (isRetroativo || motivoRetroativo) {
+      const retroTag = `[RETROATIVO] Motivo: ${motivoRetroativo || 'Não especificado'}`;
+      internalNotes = internalNotes ? `${retroTag} | ${internalNotes}` : retroTag;
     }
 
     const createdTransaction = await prisma.transaction.create({
@@ -337,6 +395,10 @@ export async function addTransaction(formData: FormData) {
       await prisma.attachment.createMany({
         data: uploadedAttachments,
       });
+    }
+
+    if (status === 'COMPLETED' || month.isClosed) {
+      await recalculateChainBalancesFromMonth(monthId);
     }
 
     revalidatePath('/');

@@ -35,15 +35,18 @@ export default function TransactionModal({
   onClose,
   monthId,
   transactionToEdit,
+  isMonthClosed = false,
 }: {
   isOpen: boolean;
   onClose: () => void;
   monthId: string;
-
   transactionToEdit?: TransactionWithAttachments | null;
+  isMonthClosed?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isRetroativo, setIsRetroativo] = useState(isMonthClosed);
+  const [motivoRetroativo, setMotivoRetroativo] = useState('');
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
@@ -113,6 +116,14 @@ export default function TransactionModal({
     setSubmitError(null);
 
     try {
+      if (isMonthClosed || isRetroativo) {
+        if (!motivoRetroativo.trim()) {
+          setSubmitError('Por favor, informe o motivo do lançamento retroativo.');
+          setLoading(false);
+          return;
+        }
+      }
+
       const submitData = new FormData();
       submitData.append('description', formData.description);
       submitData.append('amount', formData.amount);
@@ -120,6 +131,10 @@ export default function TransactionModal({
       submitData.append('date', formData.date);
       submitData.append('status', formData.status);
       submitData.append('area', formData.area);
+      if (isMonthClosed || isRetroativo) {
+        submitData.append('isRetroativo', 'true');
+        submitData.append('motivoRetroativo', motivoRetroativo.trim());
+      }
       if (formData.internalNotes) {
         submitData.append('internalNotes', formData.internalNotes);
       }
@@ -201,9 +216,34 @@ export default function TransactionModal({
             <div className="space-y-5">
               <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4 border-b border-zinc-800 pb-2">Informações Básicas</h3>
               
+              {isMonthClosed && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-200 text-xs space-y-1">
+                  <div className="font-semibold text-amber-300 flex items-center gap-1.5 text-sm">
+                    <Info className="w-4 h-4" /> Lançamento Retroativo em Mês Fechado
+                  </div>
+                  <p>Este mês está encerrado. Informe obrigatoriamente o motivo de este lançamento estar sendo feito com atraso.</p>
+                </div>
+              )}
+
               {submitError && (
                 <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
                   {submitError}
+                </div>
+              )}
+
+              {(isMonthClosed || isRetroativo) && (
+                <div>
+                  <label className="block text-sm font-medium text-amber-300 mb-1.5">
+                    Motivo do Lançamento Retroativo / Atrasado *
+                  </label>
+                  <textarea
+                    rows={2}
+                    required
+                    value={motivoRetroativo}
+                    onChange={(e) => setMotivoRetroativo(e.target.value)}
+                    placeholder="Informe o motivo pelo qual este pagamento/recebimento está sendo registrado fora do prazo..."
+                    className="w-full px-4 py-2 bg-zinc-950 border border-amber-500/40 rounded-lg text-white placeholder-zinc-500 text-xs focus:border-amber-400 focus:outline-none transition-colors resize-none"
+                  />
                 </div>
               )}
               

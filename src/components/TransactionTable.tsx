@@ -97,7 +97,30 @@ export default function TransactionTable({
               Histórico de movimentações do mês selecionado
             </p>
           </div>
-          {!monthClosed && (
+          {monthClosed ? (
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <button
+                onClick={() => {
+                  setReopenError(null);
+                  setIsReopenMonthModalOpen(true);
+                }}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-700"
+              >
+                <FolderOpen className="w-4 h-4 text-amber-400" />
+                Reabrir Mês
+              </button>
+              <button
+                onClick={() => {
+                  setTransactionToEdit(null);
+                  setIsModalOpen(true);
+                }}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-[0_0_15px_rgba(245,158,11,0.2)] hover:shadow-[0_0_20px_rgba(245,158,11,0.4)]"
+              >
+                <Plus className="w-4 h-4" />
+                Lançamento Retroativo
+              </button>
+            </div>
+          ) : (
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <button
                 onClick={() => {
@@ -177,10 +200,17 @@ export default function TransactionTable({
                       {formatDateUTC(t.date)}
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-zinc-100">
-                      <div>{t.description}</div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span>{t.description}</span>
+                        {t.internalNotes?.includes('[RETROATIVO]') && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                            Retroativo
+                          </span>
+                        )}
+                      </div>
                       {t.internalNotes && (
-                        <div className="mt-1 text-xs text-zinc-500 font-normal">
-                          <span className="font-medium text-zinc-400">Obs:</span> {t.internalNotes}
+                        <div className="mt-1 text-xs text-zinc-400 font-normal">
+                          <span className="font-medium text-zinc-500">Obs:</span> {t.internalNotes}
                         </div>
                       )}
                     </td>
@@ -334,6 +364,7 @@ export default function TransactionTable({
         }}
         monthId={monthId}
         transactionToEdit={transactionToEdit}
+        isMonthClosed={monthClosed}
       />
 
       <AttachmentPreviewModal
